@@ -204,7 +204,12 @@ const App = (() => {
       if (parts[1]) return { name: 'yarn-form', params: { id: parts[1] } };
       return { name: 'yarn-list', params: {} };
     }
-    if (parts[0] === 'pattern') return { name: 'placeholder', params: { tab: 'pattern' } };
+    if (parts[0] === 'pattern') {
+      if (parts[1] === 'new') return { name: 'pattern-form', params: {} };
+      if (parts[1] && parts[2] === 'for' && parts[3]) return { name: 'pattern-viewer', params: { id: parts[1], projectId: parts[3] } };
+      if (parts[1]) return { name: 'pattern-viewer', params: { id: parts[1] } };
+      return { name: 'pattern-list', params: {} };
+    }
     if (parts[0] === 'tools') {
       if (parts[1] === 'gauge') return { name: 'tools-gauge', params: {} };
       if (parts[1] === 'abbreviations') return { name: 'tools-abbr', params: {} };
@@ -233,7 +238,6 @@ const App = (() => {
     switch (route.name) {
       case 'list': return renderList();
       case 'archive': return renderArchive();
-      case 'placeholder': return renderPlaceholder(route.params.tab);
       case 'project-form': return renderProjectForm(route.params.id);
       case 'project-detail': return renderProjectDetail(route.params.id);
       case 'sessions': return renderSessions(route.params.id);
@@ -243,6 +247,9 @@ const App = (() => {
       case 'tools-gauge': return renderGaugeCalculator();
       case 'tools-abbr': return renderAbbreviations();
       case 'tools-backup': return renderBackup();
+      case 'pattern-list': return renderPatternList();
+      case 'pattern-form': return renderPatternForm();
+      case 'pattern-viewer': return renderPatternViewer(route.params.id, route.params.projectId);
       default: return renderList();
     }
   }
@@ -344,15 +351,6 @@ const App = (() => {
   }
 
   // ---------- View: Placeholder tabs ----------
-  function renderPlaceholder(tab) {
-    setActiveTab(tab);
-    const titles = { pattern: '도안' };
-    root.innerHTML = `
-      <header class="page-header"><h1>${titles[tab]}</h1></header>
-      ${emptyState('준비 중이에요', '다음 개발 단계에서 만나볼 수 있어요.')}
-    `;
-  }
-
   // ---------- View: Yarn List ----------
   const YARN_WEIGHTS = ['레이스', '합연사', '중세', '합태', '극태', '특극태'];
   let yarnActiveWeight = 'all';
@@ -871,6 +869,334 @@ const App = (() => {
     });
   }
 
+  // ---------- View: Pattern List ----------
+  const PATTERN_MAX_BYTES = 20 * 1024 * 1024;
+  let currentPatternObjectUrl = null;
+
+  function revokePatternObjectUrl() {
+    if (currentPatternObjectUrl) {
+      URL.revokeObjectURL(currentPatternObjectUrl);
+      currentPatternObjectUrl = null;
+    }
+  }
+
+  function renderPatternList() {
+    setActiveTab('pattern');
+    revokePatternObjectUrl();
+    const patterns = Storage.getPatterns();
+    root.innerHTML = `
+      <header class="page-header">
+        <h1>도안</h1>
+        <button class="btn primary sm" data-action="new-pattern">+ 도안 추가</button>
+      </header>
+      <div class="list">
+        ${patterns.length === 0 ? emptyState('아직 등록한 도안이 없어요', '이미지나 PDF로 된 도안을 추가해보세요.') : patterns.map(patternCard).join('')}
+      </div>
+    `;
+    root.querySelector('[data-action="new-pattern"]').addEventListener('click', () => go('#/pattern/new'));
+    root.querySelectorAll('[data-pattern-id]').forEach((el) => {
+      el.addEventListener('click', () => go(`#/pattern/${el.dataset.patternId}`));
+    });
+  }
+
+  function patternCard(pt) {
+    return `
+      <div class="card" data-pattern-id="${pt.id}">
+        <div class="card-thumb"><div class="thumb-placeholder">${pt.fileType === 'pdf' ? '📄' : '🖼️'}</div></div>
+        <div class="card-body">
+          <div class="card-title-row"><h3>${Utils.escapeHtml(pt.name)}</h3></div>
+          <p class="card-sub">${pt.fileType === 'pdf' ? `PDF · ${pt.pageCount}페이지` : '이미지'}</p>
+        </div>
+      </div>`;
+  }
+
+  // ---------- View: Pattern Upload Form ----------
+  function renderPatternForm() {
+    setActiveTab('pattern');
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1>새 도안</h1>
+      </header>
+      <form id="pattern-form" class="form">
+        <label class="field">
+          <span>도안 이름 <em>*</em></span>
+          <input type="text" name="name" placeholder="예: 겨울 목도리 도안">
+          <p class="field-error" id="name-error" hidden>이름을 입력해주세요.</p>
+        </label>
+        <label class="field">
+          <span>파일 (이미지 또는 PDF, 최대 20MB)</span>
+          <input type="file" id="pattern-file" accept="image/jpeg,image/png,application/pdf">
+          <p class="field-error" id="file-error" hidden></p>
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn primary block" id="pattern-submit" disabled>저장</button>
+        </div>
+      </form>
+    `;
+
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    let pendingFile = null;
+    let pendingMeta = null;
+
+    root.querySelector('#pattern-file').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      const errorEl = root.querySelector('#file-error');
+      const submitBtn = root.querySelector('#pattern-submit');
+      errorEl.hidden = true;
+      submitBtn.disabled = true;
+      pendingFile = null;
+      pendingMeta = null;
+      if (!file) return;
+
+      if (file.size > PATTERN_MAX_BYTES) {
+        errorEl.textContent = '파일이 너무 커요. 20MB 이하로 올려주세요.';
+        errorEl.hidden = false;
+        return;
+      }
+
+      if (file.type === 'application/pdf') {
+        try {
+          const buf = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+          pendingFile = file;
+          pendingMeta = { fileType: 'pdf', fileSize: file.size, pageCount: pdf.numPages };
+          submitBtn.disabled = false;
+        } catch (err) {
+          console.error(err);
+          errorEl.textContent = '이 PDF를 열 수 없어요. 암호가 걸려있거나 손상된 파일일 수 있어요.';
+          errorEl.hidden = false;
+        }
+      } else if (file.type === 'image/jpeg' || file.type === 'image/png') {
+        pendingFile = file;
+        pendingMeta = { fileType: 'image', fileSize: file.size, pageCount: 1 };
+        submitBtn.disabled = false;
+      } else {
+        errorEl.textContent = '이미지(JPG, PNG) 또는 PDF 파일만 올릴 수 있어요.';
+        errorEl.hidden = false;
+      }
+    });
+
+    root.querySelector('#pattern-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const name = String(fd.get('name') || '').trim();
+      const nameError = root.querySelector('#name-error');
+      if (!name) {
+        nameError.hidden = false;
+        return;
+      }
+      nameError.hidden = true;
+      if (!pendingFile || !pendingMeta) return;
+      const created = Storage.createPattern({ name, ...pendingMeta });
+      await FileStore.put(created.id, pendingFile);
+      showBanner('도안을 추가했어요.');
+      go(`#/pattern/${created.id}`);
+    });
+  }
+
+  // ---------- View: Pattern Viewer ----------
+  function renderPatternViewer(patternId, projectId) {
+    setActiveTab('pattern');
+    revokePatternObjectUrl();
+    const pattern = Storage.getPattern(patternId);
+    if (!pattern) return go('#/pattern');
+    const project = projectId ? Storage.getProject(projectId) : null;
+    const initial = (project && project.highlight) || { page: 1, y: 0.5, barThickness: 40 };
+
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1>${Utils.escapeHtml(pattern.name)}</h1>
+        <button class="icon-btn" data-action="delete-pattern">삭제</button>
+      </header>
+      <div class="pattern-toolbar">
+        <div class="pattern-toolbar-group">
+          <button type="button" class="icon-btn" data-action="zoom-out">−</button>
+          <span id="zoom-label">100%</span>
+          <button type="button" class="icon-btn" data-action="zoom-in">+</button>
+        </div>
+        ${pattern.fileType === 'pdf' ? `
+          <div class="pattern-toolbar-group">
+            <button type="button" class="icon-btn" data-action="prev-page">‹</button>
+            <span id="page-label">${initial.page} / ${pattern.pageCount}</span>
+            <button type="button" class="icon-btn" data-action="next-page">›</button>
+          </div>` : ''}
+      </div>
+      <div class="pattern-viewport" id="pattern-viewport">
+        <div class="pattern-content" id="pattern-content">
+          ${pattern.fileType === 'image' ? '<img id="pattern-surface" alt="">' : '<canvas id="pattern-surface"></canvas>'}
+          <div class="highlight-bar" id="highlight-bar"></div>
+        </div>
+      </div>
+      <div class="pattern-toolbar">
+        <div class="pattern-toolbar-group">
+          <span class="t-caption">두께</span>
+          <input type="range" id="thickness-range" min="16" max="120" step="4" value="${initial.barThickness}">
+        </div>
+        <div class="pattern-toolbar-group">
+          <button type="button" class="icon-btn" data-action="move-up">▲</button>
+          <button type="button" class="icon-btn" data-action="move-down">▼</button>
+        </div>
+      </div>
+      ${!project ? `<p class="card-meta" style="text-align:center;margin-top:8px">작품에 연결하면 하이라이트 위치가 저장돼요.</p>` : ''}
+    `;
+
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    root.querySelector('[data-action="delete-pattern"]').addEventListener('click', async () => {
+      const linked = Storage.getProjectsLinkedToPattern(patternId);
+      const ok = await Modal.confirm(linked.length ? {
+        title: '연결된 작품이 있어요',
+        message: `${linked.map((p) => p.name).join(', ')}에서 이 도안을 보고 있어요. 삭제하면 연결도 함께 풀려요.`,
+        okLabel: '삭제',
+        cancelLabel: '취소',
+        danger: true,
+      } : {
+        title: '도안을 삭제할까요?',
+        message: '삭제한 도안 파일은 되돌릴 수 없어요.',
+        okLabel: '삭제',
+        cancelLabel: '취소',
+        danger: true,
+      });
+      if (!ok) return;
+      Storage.deletePattern(patternId);
+      await FileStore.remove(patternId);
+      showBanner('도안을 삭제했어요.');
+      go('#/pattern');
+    });
+
+    let zoom = 1;
+    let page = initial.page;
+    let y = initial.y;
+    let thickness = initial.barThickness;
+    let baseWidth = 0;
+    let baseHeight = 0;
+    let pdfDoc = null;
+    let blobRef = null;
+
+    const content = root.querySelector('#pattern-content');
+    const bar = root.querySelector('#highlight-bar');
+
+    function persist() {
+      if (!project) return;
+      Storage.saveProjectHighlight(project.id, { page, y, barThickness: thickness });
+    }
+
+    function layoutBar() {
+      // content is laid out at its real zoomed pixel size (width/height set
+      // directly, not via CSS transform) so the parent viewport's overflow/
+      // scroll works correctly at any zoom level. Bar top/height are in that
+      // same zoomed pixel space.
+      const zoomedHeight = baseHeight * zoom;
+      bar.style.height = `${thickness}px`;
+      bar.style.top = `${Math.max(0, Math.min(zoomedHeight - thickness, y * zoomedHeight - thickness / 2))}px`;
+    }
+
+    function applyZoom() {
+      content.style.width = `${baseWidth * zoom}px`;
+      content.style.height = `${baseHeight * zoom}px`;
+      root.querySelector('#zoom-label').textContent = `${Math.round(zoom * 100)}%`;
+      layoutBar();
+    }
+
+    async function renderImagePage(blob) {
+      revokePatternObjectUrl();
+      currentPatternObjectUrl = URL.createObjectURL(blob);
+      const img = root.querySelector('#pattern-surface');
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.src = currentPatternObjectUrl;
+      });
+      baseWidth = img.naturalWidth;
+      baseHeight = img.naturalHeight;
+      applyZoom();
+    }
+
+    async function renderPdfPage(blob) {
+      if (!pdfDoc) {
+        const buf = await blob.arrayBuffer();
+        pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+      }
+      const pdfPage = await pdfDoc.getPage(page);
+      const pageViewport = pdfPage.getViewport({ scale: 2 });
+      const canvas = root.querySelector('#pattern-surface');
+      canvas.width = pageViewport.width;
+      canvas.height = pageViewport.height;
+      const ctx = canvas.getContext('2d');
+      await pdfPage.render({ canvasContext: ctx, viewport: pageViewport }).promise;
+      baseWidth = pageViewport.width;
+      baseHeight = pageViewport.height;
+      const label = root.querySelector('#page-label');
+      if (label) label.textContent = `${page} / ${pattern.pageCount}`;
+      applyZoom();
+    }
+
+    root.querySelector('[data-action="zoom-in"]').addEventListener('click', () => {
+      zoom = Math.min(3, +(zoom + 0.25).toFixed(2));
+      applyZoom();
+    });
+    root.querySelector('[data-action="zoom-out"]').addEventListener('click', () => {
+      zoom = Math.max(0.5, +(zoom - 0.25).toFixed(2));
+      applyZoom();
+    });
+
+    if (pattern.fileType === 'pdf') {
+      root.querySelector('[data-action="prev-page"]').addEventListener('click', async () => {
+        if (!blobRef || page <= 1) return;
+        page -= 1;
+        y = 0.5;
+        await renderPdfPage(blobRef);
+        persist();
+      });
+      root.querySelector('[data-action="next-page"]').addEventListener('click', async () => {
+        if (!blobRef || page >= pattern.pageCount) return;
+        page += 1;
+        y = 0.5;
+        await renderPdfPage(blobRef);
+        persist();
+      });
+    }
+
+    content.addEventListener('click', (e) => {
+      if (!baseHeight) return;
+      const rect = content.getBoundingClientRect();
+      const offsetY = e.clientY - rect.top;
+      y = Math.max(0, Math.min(1, offsetY / (baseHeight * zoom)));
+      layoutBar();
+      persist();
+    });
+
+    const STEP = 0.02;
+    root.querySelector('[data-action="move-up"]').addEventListener('click', () => {
+      y = Math.max(0, y - STEP);
+      layoutBar();
+      persist();
+    });
+    root.querySelector('[data-action="move-down"]').addEventListener('click', () => {
+      y = Math.min(1, y + STEP);
+      layoutBar();
+      persist();
+    });
+
+    root.querySelector('#thickness-range').addEventListener('input', (e) => {
+      thickness = Number(e.target.value);
+      layoutBar();
+      persist();
+    });
+
+    FileStore.get(pattern.id).then(async (blob) => {
+      if (!blob) {
+        showBanner('도안 파일을 찾을 수 없어요.', 'warn');
+        return;
+      }
+      blobRef = blob;
+      if (pattern.fileType === 'image') await renderImagePage(blob);
+      else await renderPdfPage(blob);
+    });
+  }
+
   // ---------- View: Project Form (create/edit) ----------
   function renderProjectForm(id) {
     const editing = !!id;
@@ -1119,6 +1445,18 @@ const App = (() => {
           </ul>`}
         <button type="button" class="btn ghost sm" data-action="link-yarn">+ 실 연결</button>
       </div>
+
+      <div class="info-block">
+        <h3>연결한 도안</h3>
+        ${project.patternId && Storage.getPattern(project.patternId) ? `
+          <p class="card-meta">${Utils.escapeHtml(Storage.getPattern(project.patternId).name)}</p>
+          <div class="form-actions">
+            <a class="btn ghost sm" href="#/pattern/${project.patternId}/for/${id}">도안 보기</a>
+            <button type="button" class="btn ghost sm" data-action="unlink-pattern">연결 해제</button>
+          </div>` : `
+          <p class="card-meta">연결된 도안이 없어요.</p>
+          <button type="button" class="btn ghost sm" data-action="link-pattern">+ 도안 연결</button>`}
+      </div>
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => go('#/'));
@@ -1211,6 +1549,54 @@ const App = (() => {
       showBanner('실을 연결했어요.');
       render();
     });
+
+    const linkPatternBtn = root.querySelector('[data-action="link-pattern"]');
+    if (linkPatternBtn) {
+      linkPatternBtn.addEventListener('click', async () => {
+        const available = Storage.getPatterns();
+        if (!available.length) {
+          const goUpload = await Modal.confirm({
+            title: '등록된 도안이 없어요',
+            message: '도안 탭에서 먼저 도안을 추가해주세요.',
+            okLabel: '도안 추가하러 가기',
+            cancelLabel: '닫기',
+          });
+          if (goUpload) go('#/pattern/new');
+          return;
+        }
+        const res = await Modal.open({
+          title: '도안 연결',
+          bodyHtml: `
+            <label class="field"><span>도안 선택</span>
+              <select data-field="patternId">
+                ${available.map((p) => `<option value="${p.id}">${Utils.escapeHtml(p.name)}</option>`).join('')}
+              </select>
+            </label>
+          `,
+          buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '연결', variant: 'primary' }],
+        });
+        if (res.id !== 'ok') return;
+        Storage.linkPatternToProject(id, res.values.patternId);
+        showBanner('도안을 연결했어요.');
+        render();
+      });
+    }
+
+    const unlinkPatternBtn = root.querySelector('[data-action="unlink-pattern"]');
+    if (unlinkPatternBtn) {
+      unlinkPatternBtn.addEventListener('click', async () => {
+        const ok = await Modal.confirm({
+          title: '도안 연결을 해제할까요?',
+          message: '하이라이트 위치가 사라져요. 도안 파일 자체는 그대로 남아요.',
+          okLabel: '해제',
+          cancelLabel: '취소',
+        });
+        if (!ok) return;
+        Storage.unlinkPatternFromProject(id);
+        showBanner('도안 연결을 해제했어요.');
+        render();
+      });
+    }
   }
 
   function statusButton(project, status, label) {

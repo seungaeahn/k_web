@@ -4,6 +4,7 @@ const Storage = (() => {
     counters: 'kw_counters',
     sessions: 'kw_sessions',
     yarns: 'kw_yarns',
+    patterns: 'kw_patterns',
     abbreviations: 'kw_abbreviations',
     settings: 'kw_settings',
     activeSession: 'kw_active_session',
@@ -87,6 +88,8 @@ const Storage = (() => {
       photos: data.photos || [],
       mainPhotoIndex: 0,
       yarns: data.yarns || [],
+      patternId: data.patternId || null,
+      highlight: data.highlight || null,
       lastWorkedAt: now,
       createdAt: now,
     };
@@ -302,6 +305,58 @@ const Storage = (() => {
     return restored;
   }
 
+  // ---- Patterns (metadata only; file bytes live in FileStore/IndexedDB) ----
+  function getPatterns() {
+    return read(KEYS.patterns, []);
+  }
+  function savePatterns(list) {
+    return write(KEYS.patterns, list);
+  }
+  function getPattern(id) {
+    return getPatterns().find((p) => p.id === id) || null;
+  }
+  function createPattern(data) {
+    const patterns = getPatterns();
+    const pattern = {
+      id: Utils.uid(),
+      name: data.name,
+      fileType: data.fileType,
+      fileSize: data.fileSize || 0,
+      pageCount: data.pageCount || 1,
+      createdAt: new Date().toISOString(),
+    };
+    patterns.push(pattern);
+    savePatterns(patterns);
+    return pattern;
+  }
+  function updatePattern(id, patch) {
+    const patterns = getPatterns();
+    const idx = patterns.findIndex((p) => p.id === id);
+    if (idx === -1) return null;
+    patterns[idx] = { ...patterns[idx], ...patch };
+    savePatterns(patterns);
+    return patterns[idx];
+  }
+  function deletePattern(id) {
+    savePatterns(getPatterns().filter((p) => p.id !== id));
+    const projects = getProjects().map((p) => (
+      p.patternId === id ? { ...p, patternId: null, highlight: null } : p
+    ));
+    saveProjects(projects);
+  }
+  function getProjectsLinkedToPattern(patternId) {
+    return getProjects().filter((p) => p.patternId === patternId);
+  }
+  function linkPatternToProject(projectId, patternId) {
+    return updateProject(projectId, { patternId, highlight: { page: 1, y: 0.5, barThickness: 40 } });
+  }
+  function unlinkPatternFromProject(projectId) {
+    return updateProject(projectId, { patternId: null, highlight: null });
+  }
+  function saveProjectHighlight(projectId, highlight) {
+    return updateProject(projectId, { highlight });
+  }
+
   // ---- Backup ----
   function exportBackup(includePhotos) {
     const projects = getProjects().map((p) => (includePhotos ? p : { ...p, photos: [], mainPhotoIndex: 0 }));
@@ -375,6 +430,8 @@ const Storage = (() => {
     getProjectsLinkedToYarn, linkYarnToProject, unlinkYarnFromProject, restoreYarnAmounts,
     getAbbreviations, findAbbreviationByTerm, createAbbreviation, updateAbbreviation, deleteAbbreviation,
     getMissingDefaultAbbreviations, restoreDefaultAbbreviations,
+    getPatterns, getPattern, createPattern, updatePattern, deletePattern,
+    getProjectsLinkedToPattern, linkPatternToProject, unlinkPatternFromProject, saveProjectHighlight,
     exportBackup, importBackup,
     getSettings, saveSettings,
     getActiveSession, setActiveSession,

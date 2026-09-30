@@ -1,13 +1,16 @@
-const CACHE_NAME = 'kw-cache-v5';
+const CACHE_NAME = 'kw-cache-v7';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/utils.js',
+  './js/filestore.js',
   './js/storage.js',
   './js/modal.js',
   './js/app.js',
+  './vendor/pdfjs/pdf.min.js',
+  './vendor/pdfjs/pdf.worker.min.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];
