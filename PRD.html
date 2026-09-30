@@ -1,0 +1,469 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-left:22px}ul{list-style:disc}ol{list-style:decimal}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-left:2px solid var(--md-rule);padding-left:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:left;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<h1>뜨개 앱 PRD</h1>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>문서 버전</td>
+<td>v0.5</td>
+</tr>
+<tr>
+<td>작성자</td>
+<td>안승애</td>
+</tr>
+<tr>
+<td>상태</td>
+<td>초안 (고도화 중)</td>
+</tr>
+<tr>
+<td>플랫폼</td>
+<td>모바일웹 PWA (홈 화면에 추가해서 사용)</td>
+</tr>
+</tbody>
+</table>
+<h3>변경 이력</h3>
+<table>
+<thead>
+<tr>
+<th>버전</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>v0.1</td>
+<td>최초 작성</td>
+</tr>
+<tr>
+<td>v0.5</td>
+<td>Ravelry API 이용 약관 확인 결과 반영: 비공식 앱 표기, 데이터 저장 최소화, 공개 배포 전 Ravelry 문의</td>
+</tr>
+<tr>
+<td>v0.4</td>
+<td>Ravelry API 문서 확인 결과 반영: 인증 방식, CORS 허용, 검색 필터, 실 양 단위. 중계 서버를 MVP에서 제외</td>
+</tr>
+<tr>
+<td>v0.3</td>
+<td>Ravelry 연동 도안 추천 기능 추가, 실 정보 항목 보강, 외부 연동 관련 비기능 요구사항 추가</td>
+</tr>
+<tr>
+<td>v0.2</td>
+<td>플랫폼 PWA 확정, 시간 기록 방식(자동+수동) 확정, 도안 PDF 지원 확정, 백업(내보내기/가져오기) 추가, 사용 시나리오·상세 정책·예외 케이스 추가</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>1. 개요</h2>
+<p>뜨개질하는 사람이 작품 진행, 실, 도안, 기록을 한 곳에서 관리하는 개인용 모바일웹 앱이다. 뜨개질 중 한 손으로도 쓸 수 있는 단순한 조작을 우선한다.</p>
+<h2>2. 배경 및 문제</h2>
+<ul>
+<li>단수를 머릿속이나 종이에 세다가 자주 놓친다.</li>
+<li>가진 실이 무엇인지, 얼마나 남았는지 한눈에 보기 어렵다.</li>
+<li>종이 도안에서 지금 뜨는 줄을 따라가기 불편하다.</li>
+<li>게이지 계산, 도안 약어 해석을 매번 따로 찾아봐야 한다.</li>
+<li>완성한 작품과 들인 시간이 기록으로 남지 않는다.</li>
+</ul>
+<h2>3. 목표</h2>
+<ul>
+<li>뜨개질 중 단수를 놓치지 않고 기록한다.</li>
+<li>작품 하나에 관련된 정보(실, 바늘, 도안, 시간, 사진)를 한 화면에 모은다.</li>
+<li>완성작을 쌓아가며 뜨개 생활을 돌아볼 수 있게 한다.</li>
+</ul>
+<p><strong>비목표</strong></p>
+<ul>
+<li>커뮤니티, 도안 판매, 다른 사용자와의 공유 기능은 다루지 않는다.</li>
+<li>회원가입, 서버 동기화는 다루지 않는다.</li>
+<li>앱스토어 출시는 다루지 않는다.</li>
+</ul>
+<h2>4. 타깃 사용자 및 사용 시나리오</h2>
+<p><strong>타깃</strong>: 취미로 뜨개질을 하는 개인 사용자 (1차: 본인)</p>
+<p><strong>시나리오 1. 저녁에 목도리 뜨기</strong>
+소파에 앉아 폰을 옆에 세워둔다. 홈 화면에서 앱을 열면 진행 중인 목도리가 바로 보인다. 한 단 뜰 때마다 화면을 톡 친다. 6단마다 꽈배기를 꼬라는 알림이 뜬다. 1시간 뒤 앱을 닫으면 오늘 뜬 시간이 자동으로 쌓여 있다.</p>
+<p><strong>시나리오 2. 새 작품 시작</strong>
+도안 PDF를 받아 작품에 연결한다. 게이지 계산기로 샘플을 재서 필요한 코 수를 구하고 작품 메모에 저장한다. 실 보관함에서 쓸 실을 골라 연결한다.</p>
+<p><strong>시나리오 3. 모르는 약어</strong>
+도안을 보다가 모르는 약어가 나오면 도구 탭의 약어 사전에서 검색한다. 없으면 직접 추가해둔다.</p>
+<p><strong>시나리오 4. 완성</strong>
+작품 상태를 완성으로 바꾸고 완성 사진을 올린다. 아카이브에서 총 뜨개 시간과 사용한 실을 함께 본다.</p>
+<p><strong>시나리오 5. 가진 실로 뜰 도안 찾기</strong>
+실 보관함에서 선물받은 실을 열고 &quot;이 실로 뜰 도안 찾기&quot;를 누른다. 실 굵기와 가진 양으로 뜰 수 있는 도안 목록이 뜬다. 무료 도안만 보도록 필터를 걸고, 마음에 드는 도안을 저장한다.</p>
+<p><strong>시나리오 6. 폰 교체</strong>
+옛 폰에서 백업 파일을 내보내 저장해두고, 새 폰에서 가져오기로 복원한다.</p>
+<h2>5. 기능 범위</h2>
+<table>
+<thead>
+<tr>
+<th>우선순위</th>
+<th>기능</th>
+<th>탭</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0</td>
+<td>작품 관리</td>
+<td>작품</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>단수 카운터</td>
+<td>작품</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>뜨개 시간 기록 (자동 + 수동)</td>
+<td>작품</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>게이지 계산기</td>
+<td>도구</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>약어 사전</td>
+<td>도구</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>실 보관함</td>
+<td>실</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>데이터 내보내기/가져오기</td>
+<td>도구</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>완성작 아카이브</td>
+<td>아카이브</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>도안 뷰어 (이미지 + PDF)</td>
+<td>도안</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Ravelry 도안 추천</td>
+<td>실, 도안</td>
+</tr>
+</tbody>
+</table>
+<h2>6. 기능 요구사항</h2>
+<h3>6.1 작품 관리 (P0)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>작품을 생성, 수정, 삭제할 수 있다.</li>
+<li>입력 항목: 작품명(필수), 시작일, 사용 실, 바늘 호수, 메모, 진행 사진</li>
+<li>상태: 진행 중 / 보류 / 완성</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>작품 목록 정렬: 진행 중 → 보류 순, 각 그룹 안에서는 최근 작업한 순</li>
+<li>완성 작품은 작품 목록이 아닌 아카이브에 노출한다.</li>
+<li>상태를 완성으로 바꾸면 완성일을 오늘로 자동 입력하고, 수정할 수 있다.</li>
+<li>완성 작품을 다시 진행 중으로 되돌릴 수 있다. 이때 완성일은 비운다.</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>작품명 미입력 시 저장 불가, 입력 필드에 안내 표시</li>
+<li>작품 삭제 시 확인 팝업: &quot;작품과 카운터, 시간 기록, 사진이 모두 삭제돼요.&quot; 연결된 실과 도안은 삭제하지 않고 연결만 해제한다.</li>
+</ul>
+<h3>6.2 단수 카운터 (P0)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>작품 상세 화면의 넓은 영역을 탭하면 +1, 별도 버튼으로 -1</li>
+<li>작품당 카운터를 여러 개 둘 수 있다. (예: 전체 단수, 무늬 반복)</li>
+<li>카운터별 반복 주기 설정: N단마다 알림</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>기본 카운터 1개(이름: 단수)를 작품 생성 시 자동 생성</li>
+<li>카운터 최소값은 0, 0에서 -1을 누르면 반응하지 않는다.</li>
+<li>반복 알림: 반복 주기의 배수에 도달하면 화면 상단에 배너와 카운터 색 변화로 알린다.</li>
+<li>반복 카운터 옵션: 주기에 도달하면 0으로 자동 리셋할지 선택 가능</li>
+<li>실행 취소: 마지막 증감을 되돌리는 버튼 제공 (직전 1회)</li>
+<li>카운터 화면이 열려 있는 동안 화면이 꺼지지 않게 한다. 지원하지 않는 환경에서는 동작하지 않아도 무방하다.</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>연속 탭 오작동 방지: 너무 빠른 연속 탭(약 0.3초 이내)은 1회로 처리</li>
+<li>카운터 리셋은 확인 팝업 후 진행</li>
+<li>카운터 삭제는 기본 카운터 1개만 남으면 불가</li>
+</ul>
+<h3>6.3 뜨개 시간 기록 (P0)</h3>
+<p><strong>기능</strong>
+두 가지 방식을 모두 지원한다.</p>
+<ul>
+<li><strong>자동 기록</strong>: 카운터를 탭하면 뜨개 세션이 시작되고, 탭이 이어지는 동안 시간을 기록한다.</li>
+<li><strong>수동 기록</strong>: 시작/정지 버튼으로 직접 기록한다.</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>자동 기록 세션: 첫 탭 시점에 시작, 마지막 탭 후 일정 시간(기본 15분, 설정에서 변경 가능) 동안 탭이 없으면 마지막 탭 시점에 종료</li>
+<li>두 방식의 중복 방지: 수동 기록이 켜져 있는 동안에는 자동 기록을 하지 않는다.</li>
+<li>세션은 작품별로 저장한다. (시작 시각, 종료 시각, 방식)</li>
+<li>작품 상세에 &quot;오늘 뜬 시간&quot;과 &quot;총 뜬 시간&quot; 표시</li>
+<li>세션 기록을 목록으로 보고, 수정·삭제할 수 있다. (잘못 기록된 시간 보정용)</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>수동 기록을 켠 채 앱을 닫은 경우: 다시 열었을 때 &quot;기록이 진행 중이에요. 계속할까요, 종료할까요?&quot; 안내. 종료 시각은 사용자가 수정 가능</li>
+<li>자동 세션 진행 중 앱을 닫은 경우: 마지막 탭 시점으로 세션 종료</li>
+<li>한 세션이 12시간을 넘으면 비정상으로 보고 확인 요청</li>
+</ul>
+<h3>6.4 게이지 계산기 (P1)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>입력: 샘플 가로·세로 크기(cm), 샘플 코 수, 샘플 단 수, 목표 가로·세로 크기(cm)</li>
+<li>출력: 목표 크기에 필요한 코 수, 단 수</li>
+<li>결과를 선택한 작품의 메모에 저장할 수 있다.</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>결과는 반올림한 정수로 표시하고, 소수점 값을 보조로 함께 보여준다.</li>
+<li>입력값 중 하나라도 비어 있으면 결과를 표시하지 않는다.</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>0 또는 음수 입력 시 해당 필드에 안내 표시</li>
+</ul>
+<h3>6.5 약어 사전 (P1)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>도안 약어와 한국어 설명을 목록으로 제공한다. (예: k2tog, ssk)</li>
+<li>약어·설명 검색</li>
+<li>사용자가 약어를 추가, 수정, 삭제할 수 있다.</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>초기 데이터: 자주 쓰는 약어 20~30개 기본 제공</li>
+<li>기본 약어도 수정 가능, 삭제한 기본 약어는 &quot;기본 약어 복원&quot;으로 되살릴 수 있다.</li>
+<li>검색은 대소문자를 구분하지 않는다.</li>
+<li>같은 약어 중복 등록 불가</li>
+</ul>
+<h3>6.6 실 보관함 (P1)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>입력 항목: 사진, 브랜드/이름(필수), 색상, 굵기, 소재, 보유량(볼 수), 볼당 길이(m), 볼당 무게(g)</li>
+<li>Ravelry 실 검색으로 실 정보를 불러와 자동 입력할 수 있다. (6.10 참고)</li>
+<li>작품에 실을 연결할 수 있다.</li>
+<li>굵기, 색상으로 필터링</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>작품에 연결할 때 사용할 볼 수를 입력하면 보유량에서 차감한다.</li>
+<li>작품 삭제 또는 연결 해제 시 차감한 양을 되돌릴지 묻는다.</li>
+<li>보유량 0인 실은 목록 하단에 흐리게 표시한다.</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>보유량보다 많이 사용하려 하면 경고 후 진행 가능 (보유량은 0으로 처리)</li>
+<li>작품에 연결된 실 삭제 시: &quot;연결된 작품이 있어요&quot; 안내 후 진행, 작품에는 실 이름만 텍스트로 남긴다.</li>
+</ul>
+<h3>6.7 데이터 내보내기/가져오기 (P1)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>전체 데이터를 파일 1개로 내보낸다.</li>
+<li>내보낸 파일을 가져와 데이터를 복원한다.</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>내보내기 시 사진 포함 여부를 선택한다. (사진 제외 시 파일 용량이 작아짐)</li>
+<li>파일명: <code>knitting-backup-YYYYMMDD.json</code></li>
+<li>가져오기는 <strong>덮어쓰기</strong> 방식: 현재 데이터를 모두 지우고 파일 내용으로 대체한다.</li>
+<li>도구 탭에 마지막 백업 날짜를 표시한다.</li>
+<li>마지막 백업 후 30일이 지나면 앱 실행 시 백업 안내 배너를 1회 표시한다.</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>가져오기 전 확인 팝업: &quot;지금 있는 데이터가 모두 바뀌어요. 먼저 백업할까요?&quot;</li>
+<li>파일 형식이 맞지 않거나 손상된 경우: 가져오기를 중단하고 기존 데이터는 유지</li>
+<li>사진 제외 백업을 가져온 경우: 사진 자리는 빈 이미지로 표시</li>
+</ul>
+<h3>6.8 완성작 아카이브 (P2)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>완성 상태의 작품을 갤러리(2열 카드)로 보여준다.</li>
+<li>카드: 대표 사진, 작품명, 완성일</li>
+<li>상세: 기간(시작일~완성일), 총 뜨개 시간, 사용 실, 바늘, 메모, 사진</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>대표 사진은 사용자가 지정하며, 미지정 시 마지막으로 올린 사진</li>
+<li>정렬: 완성일 최신순</li>
+<li>상단 요약: 완성작 수, 총 뜨개 시간</li>
+</ul>
+<h3>6.9 도안 뷰어 (P2)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li>도안 이미지(JPG, PNG) 또는 PDF를 업로드해 작품에 연결한다.</li>
+<li>현재 뜨는 줄에 가로 하이라이트 바를 두고 위아래로 이동한다.</li>
+<li>확대/축소 가능</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>PDF는 페이지 단위로 넘겨 본다.</li>
+<li>하이라이트 위치(페이지 + 위치)를 작품별로 저장하고, 다시 열면 그 위치로 이동한다.</li>
+<li>하이라이트 바 두께를 조절할 수 있다.</li>
+<li>도안 1개를 여러 작품에 연결할 수 있고, 하이라이트 위치는 작품별로 따로 저장한다.</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>파일 용량 제한: 1개당 20MB (초과 시 업로드 불가 안내)</li>
+<li>암호가 걸린 PDF, 열 수 없는 파일은 업로드 불가 안내</li>
+</ul>
+<h3>6.10 Ravelry 도안 추천 (P2)</h3>
+<p><strong>기능</strong></p>
+<ul>
+<li><strong>실 정보 불러오기</strong>: 실을 등록할 때 Ravelry에서 실을 검색해 굵기, 소재, 볼당 길이·무게를 자동으로 채운다.</li>
+<li><strong>도안 추천</strong>: 내가 가진 실을 기준으로 Ravelry 도안을 검색해 보여준다.</li>
+<li><strong>추천 결과</strong>: 도안 사진, 이름, 디자이너, 필요한 실 양, 무료/유료 여부</li>
+<li>마음에 드는 도안을 앱 안에 &quot;찜한 도안&quot;으로 저장할 수 있다.</li>
+</ul>
+<p><strong>추천 방식</strong></p>
+<ul>
+<li><strong>Ravelry 실과 연결된 경우</strong>: 그 실을 사용한 도안을 우선으로 보여준다.</li>
+<li><strong>연결되지 않은 경우</strong> (국내 실 등 Ravelry에 없는 실): 굵기 + 가진 총 길이(볼 수 × 볼당 길이)로 검색한다.</li>
+<li>추가 필터: 종류(목도리, 모자, 스웨터 등), 무료만 보기, 대바늘/코바늘</li>
+</ul>
+<p><strong>정책</strong></p>
+<ul>
+<li>가진 총 길이보다 필요한 실 양이 많은 도안은 제외한다.</li>
+<li>Ravelry의 실 양은 야드(yard) 기준이 기본이므로, 앱 안에서는 미터로 변환해 표시한다. (1야드 ≈ 0.9144m)</li>
+<li>도안 상세는 Ravelry 페이지로 연결한다. 도안 파일 구매·다운로드는 Ravelry에서 직접 한다.</li>
+<li>찜한 도안은 이름, 사진, Ravelry 링크만 저장한다. (Ravelry 데이터를 앱에 대량 저장하지 않음)</li>
+<li>추천 결과 화면에 Ravelry 출처를 표시한다.</li>
+<li>앱이 Ravelry에서 만들거나 제휴·보증한 앱이 아니라는 점을 Ravelry 기능 화면과 앱 정보에 표시한다.</li>
+<li>찜한 도안은 사용자가 찜을 해제하면 즉시 삭제한다.</li>
+</ul>
+<p><strong>예외 케이스</strong></p>
+<ul>
+<li>인터넷 연결이 없으면 &quot;인터넷 연결이 필요해요&quot; 안내, 다른 기능은 그대로 사용 가능</li>
+<li>굵기 또는 볼당 길이가 비어 있으면 추천 전에 입력을 요청한다.</li>
+<li>검색 결과가 없으면 조건 완화(필터 해제)를 안내한다.</li>
+<li>Ravelry 응답 실패 시 &quot;잠시 후 다시 시도해주세요&quot; 안내</li>
+</ul>
+<h2>7. 화면 구성</h2>
+<p>하단 탭 5개: <strong>작품 · 실 · 도안 · 도구 · 아카이브</strong></p>
+<table>
+<thead>
+<tr>
+<th>화면</th>
+<th>주요 요소</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>작품 목록</td>
+<td>진행 중·보류 작품 카드, 새 작품 추가</td>
+</tr>
+<tr>
+<td>작품 상세</td>
+<td>단수 카운터, 오늘/총 뜬 시간, 수동 기록 버튼, 실·바늘 정보, 도안 바로가기, 사진, 메모</td>
+</tr>
+<tr>
+<td>시간 기록 목록</td>
+<td>세션별 날짜·시간·방식, 수정/삭제</td>
+</tr>
+<tr>
+<td>실 보관함</td>
+<td>실 카드 목록, 필터, 실 추가(Ravelry 실 검색)</td>
+</tr>
+<tr>
+<td>실 상세</td>
+<td>실 정보, 연결된 작품, &quot;이 실로 뜰 도안 찾기&quot;</td>
+</tr>
+<tr>
+<td>도안 추천 결과</td>
+<td>필터, 도안 카드 목록, 찜하기, Ravelry로 이동</td>
+</tr>
+<tr>
+<td>도안</td>
+<td>내 도안 목록, 찜한 도안, 도안 뷰어(하이라이트 바)</td>
+</tr>
+<tr>
+<td>도구</td>
+<td>게이지 계산기, 약어 사전, 백업(내보내기/가져오기, 마지막 백업일), 설정</td>
+</tr>
+<tr>
+<td>아카이브</td>
+<td>요약, 완성작 갤러리, 완성작 상세</td>
+</tr>
+</tbody>
+</table>
+<h2>8. 데이터 구조</h2>
+<ul>
+<li><strong>Project</strong>: id, 이름, 상태, 시작일, 완성일, 바늘, 메모, 사진[], 대표사진, 연결실[{실ID, 사용량}], 도안ID, 하이라이트위치, 최근작업일시</li>
+<li><strong>Counter</strong>: id, 작품ID, 이름, 현재값, 반복주기, 자동리셋여부</li>
+<li><strong>Session</strong>: id, 작품ID, 시작시각, 종료시각, 방식(자동/수동)</li>
+<li><strong>Yarn</strong>: id, 이름, 색상, 굵기, 소재, 보유량, 볼당길이, 볼당무게, 사진, RavelryYarnID(선택)</li>
+<li><strong>SavedPattern</strong>: id, RavelryPatternID, 이름, 사진URL, 링크, 찜한날짜</li>
+<li><strong>Pattern</strong>: id, 파일, 형식(이미지/PDF), 페이지수</li>
+<li><strong>Abbreviation</strong>: 약어, 설명, 기본여부</li>
+<li><strong>Settings</strong>: 자동세션종료시간, 마지막백업일</li>
+</ul>
+<h2>9. 비기능 요구사항</h2>
+<ul>
+<li><strong>플랫폼</strong>: PWA. 아이폰 사파리에서 &quot;홈 화면에 추가&quot;로 설치해 주소창 없이 실행</li>
+<li><strong>저장</strong>: 모든 데이터는 기기 브라우저에 저장, 데이터 저장용 서버 없음</li>
+<li><strong>데이터 보존</strong>: 홈 화면 설치 사용을 권장하고, 첫 실행 시 설치 방법을 안내한다.</li>
+<li><strong>조작</strong>: 세로 화면 기준, 주요 버튼은 손가락으로 누르기 충분한 크기, 카운터 탭 영역은 화면 절반 이상</li>
+<li><strong>오프라인</strong>: Ravelry 연동을 제외한 모든 기능은 인터넷 연결 없이 동작</li>
+<li><strong>Ravelry 연동</strong>
+<ul>
+<li><strong>인증</strong>: 읽기 전용 Basic Auth 키를 사용한다. 인증이 필요 없는 공개 메서드(도안 검색, 실 검색 등)만 호출할 수 있다.</li>
+<li><strong>개인 계정 키 사용 금지</strong>: 개인 계정 키는 Ravelry 계정 전체 권한을 가지므로 앱 코드에 절대 넣지 않는다.</li>
+<li><strong>호출 방식</strong>: Ravelry API가 CORS를 허용하므로 앱에서 직접 호출한다. 개인용 앱으로 링크를 공개하지 않는 조건이다.</li>
+<li><strong>공개 배포 시</strong>: 다른 사람도 쓰게 되면 키 노출을 막기 위해 중계 서버(서버리스 함수)를 두고 그 뒤로 키를 옮긴다.</li>
+<li><strong>요청 관리</strong>: 같은 검색은 결과를 캐시하고, ETag를 사용해 불필요한 재요청을 줄인다. 페이지당 결과 수는 100개 이하로 한다.</li>
+<li><strong>이용 약관 준수</strong> (Ravelry Application Developer and API License Agreement v1.0)
+<ul>
+<li>비공식 앱임을 명확히 표시하고, Ravelry와 관련 있거나 보증받은 것처럼 보이지 않게 한다.</li>
+<li>Ravelry 데이터는 기능에 필요한 만큼만, 필요한 기간 동안만 저장한다.</li>
+<li>Ravelry 데이터를 판매하거나 다른 곳에 재배포하지 않는다.</li>
+<li>Ravelry 또는 데이터 소유자가 요청하면 저장한 데이터를 즉시 삭제할 수 있어야 한다.</li>
+<li>앱 정보 화면에 Ravelry 데이터를 어떻게 가져오고 저장하는지 안내한다.</li>
+<li>공개 배포 전에는 <a href="mailto:api@ravelry.com">api@ravelry.com</a>에 사용 목적을 문의한다.</li>
+</ul>
+</li>
+<li><strong>응답 코드 처리</strong>: 403(키 오류), 429(요청 과다), 503(Ravelry 장애)은 사용자에게 각각 안내한다.</li>
+</ul>
+</li>
+<li><strong>화면 모드</strong>: 라이트/다크 모드 대응</li>
+<li><strong>용량</strong>: 저장 공간 부족 시 안내하고 사진 정리 또는 백업을 권한다.</li>
+</ul>
+<h2>10. 성공 기준</h2>
+<ul>
+<li>진행 중인 작품을 이 앱의 카운터로 끝까지 기록한다.</li>
+<li>한 달 이상 꾸준히 사용한다.</li>
+<li>완성작 3개 이상이 아카이브에 쌓인다.</li>
+</ul>
+<h2>11. 개발 단계</h2>
+<ol>
+<li>작품 관리 + 단수 카운터 + 시간 기록 (P0)</li>
+<li>도구 탭: 게이지 계산기, 약어 사전, 백업</li>
+<li>실 보관함</li>
+<li>아카이브</li>
+<li>도안 뷰어 (이미지 → PDF 순)</li>
+<li>Ravelry 연동: 실 정보 불러오기 → 도안 추천 (API 직접 호출)</li>
+</ol>
+<h2>12. 오픈 이슈</h2>
+<ul>
+<li>자동 세션 종료 기본값 15분이 적절한지 실사용 후 조정</li>
+<li>약어 사전 초기 데이터 목록 확정</li>
+<li>실 굵기 분류 기준: Ravelry 굵기 분류(Lace, Fingering, DK, Worsted 등)와 국내 표기(합태, 중세, 극태 등)의 매핑</li>
+<li>공개 배포 여부: 약관상 Ravelry와 무관한 앱이 Ravelry 데이터를 쓰려면 문의를 권하고, Ravelry 자체 기능과 경쟁하는 앱을 금지함. 실 보관함·프로젝트 관리는 Ravelry에도 있는 기능이라, 공개 배포 시 해당 여부를 Ravelry에 확인 필요</li>
+<li>도안 검색 필터 파라미터 확정: API는 Ravelry 사이트 도안 검색의 필터를 그대로 지원하므로, 사이트에서 굵기·실 양·무료 필터를 걸고 URL에 붙는 값을 확인해 사용</li>
+<li>필요한 실 양 비교 기준: 도안 사이즈별로 필요량이 다를 때 어떤 값을 기준으로 할지</li>
+</ul>
+
+</body></html>
