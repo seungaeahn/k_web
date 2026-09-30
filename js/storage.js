@@ -4,12 +4,43 @@ const Storage = (() => {
     counters: 'kw_counters',
     sessions: 'kw_sessions',
     yarns: 'kw_yarns',
+    abbreviations: 'kw_abbreviations',
     settings: 'kw_settings',
     activeSession: 'kw_active_session',
     lastAction: 'kw_last_action',
   };
 
   const DEFAULT_SETTINGS = { autoEndMinutes: 15, lastBackupAt: null };
+
+  const DEFAULT_ABBREVIATIONS = [
+    { term: 'k', desc: '겉뜨기' },
+    { term: 'p', desc: '안뜨기' },
+    { term: 'k2tog', desc: '겉뜨기 2코 모아뜨기 (오른쪽으로 기울어짐)' },
+    { term: 'p2tog', desc: '안뜨기 2코 모아뜨기' },
+    { term: 'ssk', desc: '코를 하나씩 옮겨 걸고 겉뜨기로 모아뜨기 (왼쪽으로 기울어짐)' },
+    { term: 'yo', desc: '바늘에 실을 감아 걸기 (콧수 늘리기)' },
+    { term: 'sl', desc: '코를 뜨지 않고 그대로 옮기기' },
+    { term: 'psso', desc: '옮긴 코를 바로 앞 코 위로 넘기기' },
+    { term: 'kfb', desc: '한 코의 앞뒤에 각각 겉뜨기해서 한 코 늘리기' },
+    { term: 'm1', desc: '코와 코 사이의 실을 들어올려 한 코 늘리기' },
+    { term: 'co', desc: '코 만들기 (기초코)' },
+    { term: 'bo', desc: '코 막기' },
+    { term: 'rs', desc: '겉면 단' },
+    { term: 'ws', desc: '안면 단' },
+    { term: 'rep', desc: '반복' },
+    { term: 'st(s)', desc: '코(들)' },
+    { term: 'rnd(s)', desc: '단 (둥근뜨기 기준)' },
+    { term: 'pm', desc: '스티치 마커 놓기' },
+    { term: 'sm', desc: '마커를 오른쪽 바늘로 옮기기' },
+    { term: 'dpn', desc: '장갑바늘 (양쪽 바늘)' },
+    { term: 'circ', desc: '줄바늘' },
+    { term: 'tbl', desc: '코의 뒷면으로 뜨기' },
+    { term: 'wyif', desc: '실을 뜨개 앞쪽에 두고 뜨기' },
+    { term: 'wyib', desc: '실을 뜨개 뒤쪽에 두고 뜨기' },
+    { term: 'c4f', desc: '4코 꽈배기, 앞쪽으로 교차' },
+    { term: 'c4b', desc: '4코 꽈배기, 뒤쪽으로 교차' },
+    { term: 'gauge', desc: '게이지, 정해진 크기당 코 수와 단 수' },
+  ];
 
   function read(key, fallback) {
     try {
@@ -221,6 +252,90 @@ const Storage = (() => {
     });
   }
 
+  // ---- Abbreviations ----
+  function seedAbbreviationsIfEmpty() {
+    if (read(KEYS.abbreviations, null) === null) {
+      const seeded = DEFAULT_ABBREVIATIONS.map((a) => ({
+        id: Utils.uid(), term: a.term, description: a.desc, isDefault: true,
+      }));
+      write(KEYS.abbreviations, seeded);
+    }
+  }
+  function getAbbreviations() {
+    seedAbbreviationsIfEmpty();
+    return read(KEYS.abbreviations, []);
+  }
+  function saveAbbreviations(list) {
+    return write(KEYS.abbreviations, list);
+  }
+  function findAbbreviationByTerm(term, excludeId) {
+    return getAbbreviations().find((a) => a.term.toLowerCase() === term.toLowerCase() && a.id !== excludeId) || null;
+  }
+  function createAbbreviation({ term, description }) {
+    const list = getAbbreviations();
+    const abbr = { id: Utils.uid(), term, description, isDefault: false };
+    list.push(abbr);
+    saveAbbreviations(list);
+    return abbr;
+  }
+  function updateAbbreviation(id, patch) {
+    const list = getAbbreviations();
+    const idx = list.findIndex((a) => a.id === id);
+    if (idx === -1) return null;
+    list[idx] = { ...list[idx], ...patch };
+    saveAbbreviations(list);
+    return list[idx];
+  }
+  function deleteAbbreviation(id) {
+    saveAbbreviations(getAbbreviations().filter((a) => a.id !== id));
+  }
+  function getMissingDefaultAbbreviations() {
+    const current = getAbbreviations();
+    return DEFAULT_ABBREVIATIONS.filter((d) => !current.some((a) => a.term.toLowerCase() === d.term.toLowerCase()));
+  }
+  function restoreDefaultAbbreviations() {
+    const missing = getMissingDefaultAbbreviations();
+    if (!missing.length) return [];
+    const list = getAbbreviations();
+    const restored = missing.map((d) => ({ id: Utils.uid(), term: d.term, description: d.desc, isDefault: true }));
+    saveAbbreviations([...list, ...restored]);
+    return restored;
+  }
+
+  // ---- Backup ----
+  function exportBackup(includePhotos) {
+    const projects = getProjects().map((p) => (includePhotos ? p : { ...p, photos: [], mainPhotoIndex: 0 }));
+    const yarns = getYarns().map((y) => (includePhotos ? y : { ...y, photo: null }));
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      includesPhotos: !!includePhotos,
+      data: {
+        projects,
+        counters: getCounters(),
+        sessions: getSessions(),
+        yarns,
+        abbreviations: getAbbreviations(),
+      },
+    };
+    saveSettings({ lastBackupAt: new Date().toISOString() });
+    return payload;
+  }
+  function importBackup(parsed) {
+    if (!parsed || typeof parsed !== 'object' || !parsed.data) return false;
+    const { data } = parsed;
+    if (!Array.isArray(data.projects) || !Array.isArray(data.counters) || !Array.isArray(data.sessions)
+      || !Array.isArray(data.yarns) || !Array.isArray(data.abbreviations)) return false;
+    saveProjects(data.projects);
+    saveCounters(data.counters);
+    saveSessions(data.sessions);
+    saveYarns(data.yarns);
+    saveAbbreviations(data.abbreviations);
+    setActiveSession(null);
+    setLastAction(null);
+    return true;
+  }
+
   // ---- Settings ----
   function getSettings() {
     return { ...DEFAULT_SETTINGS, ...read(KEYS.settings, {}) };
@@ -258,6 +373,9 @@ const Storage = (() => {
     getSessions, getSessionsByProject, addSession, updateSession, deleteSession,
     getYarns, getYarn, createYarn, updateYarn, deleteYarn,
     getProjectsLinkedToYarn, linkYarnToProject, unlinkYarnFromProject, restoreYarnAmounts,
+    getAbbreviations, findAbbreviationByTerm, createAbbreviation, updateAbbreviation, deleteAbbreviation,
+    getMissingDefaultAbbreviations, restoreDefaultAbbreviations,
+    exportBackup, importBackup,
     getSettings, saveSettings,
     getActiveSession, setActiveSession,
     getLastAction, setLastAction,

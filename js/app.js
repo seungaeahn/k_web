@@ -205,7 +205,12 @@ const App = (() => {
       return { name: 'yarn-list', params: {} };
     }
     if (parts[0] === 'pattern') return { name: 'placeholder', params: { tab: 'pattern' } };
-    if (parts[0] === 'tools') return { name: 'placeholder', params: { tab: 'tools' } };
+    if (parts[0] === 'tools') {
+      if (parts[1] === 'gauge') return { name: 'tools-gauge', params: {} };
+      if (parts[1] === 'abbreviations') return { name: 'tools-abbr', params: {} };
+      if (parts[1] === 'backup') return { name: 'tools-backup', params: {} };
+      return { name: 'tools-home', params: {} };
+    }
     if (parts[0] === 'project') {
       if (parts[1] === 'new') return { name: 'project-form', params: {} };
       if (parts[2] === 'edit') return { name: 'project-form', params: { id: parts[1] } };
@@ -234,6 +239,10 @@ const App = (() => {
       case 'sessions': return renderSessions(route.params.id);
       case 'yarn-list': return renderYarnList();
       case 'yarn-form': return renderYarnForm(route.params.id);
+      case 'tools-home': return renderToolsHome();
+      case 'tools-gauge': return renderGaugeCalculator();
+      case 'tools-abbr': return renderAbbreviations();
+      case 'tools-backup': return renderBackup();
       default: return renderList();
     }
   }
@@ -337,7 +346,7 @@ const App = (() => {
   // ---------- View: Placeholder tabs ----------
   function renderPlaceholder(tab) {
     setActiveTab(tab);
-    const titles = { pattern: '도안', tools: '도구' };
+    const titles = { pattern: '도안' };
     root.innerHTML = `
       <header class="page-header"><h1>${titles[tab]}</h1></header>
       ${emptyState('준비 중이에요', '다음 개발 단계에서 만나볼 수 있어요.')}
@@ -552,6 +561,313 @@ const App = (() => {
         showBanner('새 실을 등록했어요.');
       }
       go('#/yarn');
+    });
+  }
+
+  // ---------- View: Tools Home ----------
+  function renderToolsHome() {
+    setActiveTab('tools');
+    root.innerHTML = `
+      <header class="page-header"><h1>도구</h1></header>
+      <a class="link-row" href="#/tools/gauge">게이지 계산기 →</a>
+      <a class="link-row" href="#/tools/abbreviations">약어 사전 →</a>
+      <a class="link-row" href="#/tools/backup">백업 (내보내기/가져오기) →</a>
+    `;
+  }
+
+  // ---------- View: Gauge Calculator ----------
+  const GAUGE_FIELDS = ['sampleWidth', 'sampleHeight', 'sampleStitches', 'sampleRows', 'targetWidth', 'targetHeight'];
+
+  function renderGaugeCalculator() {
+    setActiveTab('tools');
+    const projects = Storage.getProjects();
+
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1>게이지 계산기</h1>
+      </header>
+      <form id="gauge-form" class="form">
+        <div class="grid-2">
+          <label class="field"><span>샘플 가로(cm)</span><input type="number" name="sampleWidth" min="0" step="0.1"><p class="field-error" data-error="sampleWidth" hidden>0보다 큰 값을 입력해주세요.</p></label>
+          <label class="field"><span>샘플 세로(cm)</span><input type="number" name="sampleHeight" min="0" step="0.1"><p class="field-error" data-error="sampleHeight" hidden>0보다 큰 값을 입력해주세요.</p></label>
+        </div>
+        <div class="grid-2">
+          <label class="field"><span>샘플 코 수</span><input type="number" name="sampleStitches" min="0" step="1"><p class="field-error" data-error="sampleStitches" hidden>0보다 큰 값을 입력해주세요.</p></label>
+          <label class="field"><span>샘플 단 수</span><input type="number" name="sampleRows" min="0" step="1"><p class="field-error" data-error="sampleRows" hidden>0보다 큰 값을 입력해주세요.</p></label>
+        </div>
+        <div class="grid-2">
+          <label class="field"><span>목표 가로(cm)</span><input type="number" name="targetWidth" min="0" step="0.1"><p class="field-error" data-error="targetWidth" hidden>0보다 큰 값을 입력해주세요.</p></label>
+          <label class="field"><span>목표 세로(cm)</span><input type="number" name="targetHeight" min="0" step="0.1"><p class="field-error" data-error="targetHeight" hidden>0보다 큰 값을 입력해주세요.</p></label>
+        </div>
+      </form>
+      <div class="stat-row" id="gauge-result" hidden>
+        <div class="stat"><span id="result-stitches">-</span><label>필요한 코 수</label></div>
+        <div class="stat"><span id="result-rows">-</span><label>필요한 단 수</label></div>
+      </div>
+      ${projects.length ? `
+        <div class="info-block" id="gauge-save" hidden>
+          <h3>결과를 작품 메모에 저장</h3>
+          <label class="field">
+            <select id="gauge-project-select">${projects.map((p) => `<option value="${p.id}">${Utils.escapeHtml(p.name)}</option>`).join('')}</select>
+          </label>
+          <button type="button" class="btn ghost sm" data-action="save-memo">메모에 저장</button>
+        </div>` : ''}
+    `;
+
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    const form = root.querySelector('#gauge-form');
+    const resultBox = root.querySelector('#gauge-result');
+    const saveBox = root.querySelector('#gauge-save');
+    let lastResult = null;
+
+    function calc() {
+      const fd = new FormData(form);
+      const values = {};
+      let hasEmpty = false;
+      let hasInvalid = false;
+      GAUGE_FIELDS.forEach((f) => {
+        const raw = fd.get(f);
+        const errorEl = root.querySelector(`[data-error="${f}"]`);
+        if (raw === '' || raw == null) {
+          hasEmpty = true;
+          if (errorEl) errorEl.hidden = true;
+          return;
+        }
+        const num = Number(raw);
+        values[f] = num;
+        if (Number.isNaN(num) || num <= 0) {
+          hasInvalid = true;
+          if (errorEl) errorEl.hidden = false;
+        } else if (errorEl) {
+          errorEl.hidden = true;
+        }
+      });
+
+      if (hasEmpty || hasInvalid) {
+        resultBox.hidden = true;
+        if (saveBox) saveBox.hidden = true;
+        lastResult = null;
+        return;
+      }
+
+      const neededStitches = (values.sampleStitches / values.sampleWidth) * values.targetWidth;
+      const neededRows = (values.sampleRows / values.sampleHeight) * values.targetHeight;
+      lastResult = {
+        stitches: Math.round(neededStitches), rows: Math.round(neededRows),
+        targetWidth: values.targetWidth, targetHeight: values.targetHeight,
+      };
+
+      root.querySelector('#result-stitches').textContent = `${lastResult.stitches}코 (${neededStitches.toFixed(1)})`;
+      root.querySelector('#result-rows').textContent = `${lastResult.rows}단 (${neededRows.toFixed(1)})`;
+      resultBox.hidden = false;
+      if (saveBox) saveBox.hidden = false;
+    }
+
+    form.addEventListener('input', calc);
+
+    const saveBtn = root.querySelector('[data-action="save-memo"]');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        if (!lastResult) return;
+        const projectId = root.querySelector('#gauge-project-select').value;
+        const project = Storage.getProject(projectId);
+        if (!project) return;
+        const note = `[게이지 계산] 목표 ${lastResult.targetWidth}x${lastResult.targetHeight}cm → ${lastResult.stitches}코 x ${lastResult.rows}단`;
+        const memo = project.memo ? `${project.memo}\n${note}` : note;
+        Storage.updateProject(projectId, { memo });
+        showBanner('작품 메모에 저장했어요.');
+      });
+    }
+  }
+
+  // ---------- View: Abbreviation Dictionary ----------
+  function renderAbbreviations() {
+    setActiveTab('tools');
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1>약어 사전</h1>
+        <button class="btn primary sm" data-action="new-abbr">+ 추가</button>
+      </header>
+      <label class="field"><input type="text" id="abbr-search" placeholder="약어, 설명 검색"></label>
+      <div class="list" id="abbr-list-body"></div>
+      <div class="list-footer-link" id="abbr-restore" hidden><a href="#" data-action="restore-defaults">기본 약어 복원</a></div>
+    `;
+
+    function renderBody() {
+      const q = root.querySelector('#abbr-search').value.trim().toLowerCase();
+      const list = Storage.getAbbreviations()
+        .filter((a) => !q || a.term.toLowerCase().includes(q) || a.description.toLowerCase().includes(q))
+        .sort((a, b) => a.term.localeCompare(b.term));
+      const body = root.querySelector('#abbr-list-body');
+      body.innerHTML = list.length === 0
+        ? emptyState('약어가 없어요', '검색어를 바꾸거나 새 약어를 추가해보세요.')
+        : list.map(abbrRow).join('');
+      body.querySelectorAll('[data-edit-abbr]').forEach((btn) => {
+        btn.addEventListener('click', () => openAbbrEditor(btn.dataset.editAbbr));
+      });
+      body.querySelectorAll('[data-delete-abbr]').forEach((btn) => {
+        btn.addEventListener('click', () => deleteAbbr(btn.dataset.deleteAbbr));
+      });
+      root.querySelector('#abbr-restore').hidden = Storage.getMissingDefaultAbbreviations().length === 0;
+    }
+
+    async function openAbbrEditor(id) {
+      const existing = id ? Storage.getAbbreviations().find((a) => a.id === id) : null;
+      const res = await Modal.open({
+        title: existing ? '약어 수정' : '약어 추가',
+        bodyHtml: `
+          <label class="field"><span>약어</span><input type="text" data-field="term" value="${existing ? Utils.escapeHtml(existing.term) : ''}" placeholder="예: k2tog"></label>
+          <label class="field"><span>설명</span><input type="text" data-field="description" value="${existing ? Utils.escapeHtml(existing.description) : ''}" placeholder="예: 겉뜨기 2코 모아뜨기"></label>
+        `,
+        buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '저장', variant: 'primary' }],
+      });
+      if (res.id !== 'ok') return;
+      const term = (res.values.term || '').trim();
+      const description = (res.values.description || '').trim();
+      if (!term || !description) {
+        showBanner('약어와 설명을 모두 입력해주세요.', 'warn');
+        return;
+      }
+      const dup = Storage.findAbbreviationByTerm(term, existing ? existing.id : null);
+      if (dup) {
+        showBanner('이미 등록된 약어예요.', 'warn');
+        return;
+      }
+      if (existing) {
+        Storage.updateAbbreviation(existing.id, { term, description });
+        showBanner('약어를 수정했어요.');
+      } else {
+        Storage.createAbbreviation({ term, description });
+        showBanner('약어를 추가했어요.');
+      }
+      renderBody();
+    }
+
+    async function deleteAbbr(id) {
+      const ok = await Modal.confirm({
+        title: '약어를 삭제할까요?',
+        message: '기본 약어라면 나중에 "기본 약어 복원"으로 되살릴 수 있어요.',
+        okLabel: '삭제',
+        cancelLabel: '취소',
+        danger: true,
+      });
+      if (!ok) return;
+      Storage.deleteAbbreviation(id);
+      showBanner('약어를 삭제했어요.');
+      renderBody();
+    }
+
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+    root.querySelector('[data-action="new-abbr"]').addEventListener('click', () => openAbbrEditor(null));
+    root.querySelector('#abbr-search').addEventListener('input', renderBody);
+    root.querySelector('[data-action="restore-defaults"]').addEventListener('click', (e) => {
+      e.preventDefault();
+      const restored = Storage.restoreDefaultAbbreviations();
+      showBanner(restored.length ? `기본 약어 ${restored.length}개를 복원했어요.` : '복원할 기본 약어가 없어요.');
+      renderBody();
+    });
+
+    renderBody();
+  }
+
+  function abbrRow(a) {
+    return `
+      <div class="counter-row">
+        <div class="counter-row-main">
+          <strong>${Utils.escapeHtml(a.term)}</strong>
+          <span class="card-sub">${Utils.escapeHtml(a.description)}</span>
+        </div>
+        <div class="counter-row-controls">
+          <button type="button" class="icon-btn sm" data-edit-abbr="${a.id}">수정</button>
+          <button type="button" class="icon-btn sm" data-delete-abbr="${a.id}">삭제</button>
+        </div>
+      </div>`;
+  }
+
+  // ---------- View: Backup ----------
+  function renderBackup() {
+    setActiveTab('tools');
+    const settings = Storage.getSettings();
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1>백업</h1>
+      </header>
+      <div class="info-block">
+        <h3>마지막 백업</h3>
+        <p class="card-meta">${settings.lastBackupAt ? Utils.formatDateTime(settings.lastBackupAt) : '아직 백업한 적 없어요'}</p>
+      </div>
+      <div class="form">
+        <label class="field checkbox">
+          <input type="checkbox" id="include-photos" checked>
+          <span>사진 포함해서 내보내기</span>
+        </label>
+        <div class="form-actions">
+          <button type="button" class="btn primary block" data-action="export">데이터 내보내기</button>
+        </div>
+      </div>
+      <div class="form">
+        <label class="field">
+          <span>백업 파일 가져오기</span>
+          <input type="file" id="import-input" accept="application/json,.json">
+        </label>
+      </div>
+    `;
+
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    root.querySelector('[data-action="export"]').addEventListener('click', () => {
+      const includePhotos = root.querySelector('#include-photos').checked;
+      const payload = Storage.exportBackup(includePhotos);
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const d = new Date();
+      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+      a.href = url;
+      a.download = `knitting-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showBanner('백업 파일을 내보냈어요.');
+      renderBackup();
+    });
+
+    root.querySelector('#import-input').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const proceed = await Modal.confirm({
+        title: '데이터를 덮어쓸까요?',
+        message: '가져오기를 하면 지금 있는 데이터가 모두 사라지고 파일 내용으로 바뀌어요. 걱정되면 취소하고 먼저 내보내기를 해두세요.',
+        okLabel: '가져오기',
+        cancelLabel: '취소',
+        danger: true,
+      });
+      if (!proceed) {
+        e.target.value = '';
+        return;
+      }
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const ok = Storage.importBackup(parsed);
+        if (!ok) {
+          showBanner('백업 파일 형식이 올바르지 않아요.', 'warn');
+          return;
+        }
+        showBanner('데이터를 가져왔어요.');
+        go('#/');
+      } catch (err) {
+        console.error(err);
+        showBanner('백업 파일을 읽을 수 없어요.', 'warn');
+      } finally {
+        e.target.value = '';
+      }
     });
   }
 
@@ -1152,6 +1468,16 @@ const App = (() => {
     renderSessions(projectId);
   }
 
+  // ---------- Backup reminder ----------
+  function checkBackupReminder() {
+    const settings = Storage.getSettings();
+    const last = settings.lastBackupAt;
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    if (!last || Date.now() - new Date(last).getTime() > THIRTY_DAYS) {
+      showBanner('마지막 백업이 오래됐어요. 도구 탭에서 백업할 수 있어요.', 'info', 5000);
+    }
+  }
+
   // ---------- Service worker ----------
   function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
@@ -1172,6 +1498,7 @@ const App = (() => {
     render();
     startClock();
     checkPendingSessionOnBoot();
+    checkBackupReminder();
     registerServiceWorker();
   }
 
