@@ -3,6 +3,7 @@ const Storage = (() => {
     projects: 'kw_projects',
     counters: 'kw_counters',
     sessions: 'kw_sessions',
+    yarns: 'kw_yarns',
     settings: 'kw_settings',
     activeSession: 'kw_active_session',
     lastAction: 'kw_last_action',
@@ -54,6 +55,7 @@ const Storage = (() => {
       memo: data.memo || '',
       photos: data.photos || [],
       mainPhotoIndex: 0,
+      yarns: data.yarns || [],
       lastWorkedAt: now,
       createdAt: now,
     };
@@ -149,6 +151,76 @@ const Storage = (() => {
     saveSessions(getSessions().filter((s) => s.id !== id));
   }
 
+  // ---- Yarns ----
+  function getYarns() {
+    return read(KEYS.yarns, []);
+  }
+  function saveYarns(list) {
+    return write(KEYS.yarns, list);
+  }
+  function getYarn(id) {
+    return getYarns().find((y) => y.id === id) || null;
+  }
+  function createYarn(data) {
+    const yarns = getYarns();
+    const yarn = {
+      id: Utils.uid(),
+      name: data.name,
+      color: data.color || '',
+      weight: data.weight || '',
+      material: data.material || '',
+      amount: Math.max(0, Number(data.amount) || 0),
+      lengthPerBall: data.lengthPerBall != null && data.lengthPerBall !== '' ? Number(data.lengthPerBall) : null,
+      weightPerBall: data.weightPerBall != null && data.weightPerBall !== '' ? Number(data.weightPerBall) : null,
+      photo: data.photo || null,
+      createdAt: new Date().toISOString(),
+    };
+    yarns.push(yarn);
+    saveYarns(yarns);
+    return yarn;
+  }
+  function updateYarn(id, patch) {
+    const yarns = getYarns();
+    const idx = yarns.findIndex((y) => y.id === id);
+    if (idx === -1) return null;
+    yarns[idx] = { ...yarns[idx], ...patch };
+    saveYarns(yarns);
+    return yarns[idx];
+  }
+  function deleteYarn(id) {
+    saveYarns(getYarns().filter((y) => y.id !== id));
+  }
+  function getProjectsLinkedToYarn(yarnId) {
+    return getProjects().filter((p) => (p.yarns || []).some((l) => l.yarnId === yarnId));
+  }
+  function linkYarnToProject(projectId, yarnId, amount) {
+    const project = getProject(projectId);
+    const yarn = getYarn(yarnId);
+    if (!project || !yarn) return null;
+    const amt = Math.max(0, Number(amount) || 0);
+    updateYarn(yarnId, { amount: Math.max(0, yarn.amount - amt) });
+    const yarns = [...(project.yarns || []), { yarnId, yarnName: yarn.name, amount: amt }];
+    return updateProject(projectId, { yarns });
+  }
+  function unlinkYarnFromProject(projectId, yarnId, restore) {
+    const project = getProject(projectId);
+    if (!project) return null;
+    const link = (project.yarns || []).find((l) => l.yarnId === yarnId);
+    const yarns = (project.yarns || []).filter((l) => l.yarnId !== yarnId);
+    updateProject(projectId, { yarns });
+    if (restore && link) {
+      const yarn = getYarn(yarnId);
+      if (yarn) updateYarn(yarnId, { amount: yarn.amount + link.amount });
+    }
+    return true;
+  }
+  function restoreYarnAmounts(project) {
+    (project.yarns || []).forEach((link) => {
+      const yarn = getYarn(link.yarnId);
+      if (yarn) updateYarn(link.yarnId, { amount: yarn.amount + link.amount });
+    });
+  }
+
   // ---- Settings ----
   function getSettings() {
     return { ...DEFAULT_SETTINGS, ...read(KEYS.settings, {}) };
@@ -184,6 +256,8 @@ const Storage = (() => {
     getProjects, saveProjects, getProject, createProject, updateProject, touchProject, deleteProject,
     getCounters, getCountersByProject, createCounter, updateCounter, deleteCounter,
     getSessions, getSessionsByProject, addSession, updateSession, deleteSession,
+    getYarns, getYarn, createYarn, updateYarn, deleteYarn,
+    getProjectsLinkedToYarn, linkYarnToProject, unlinkYarnFromProject, restoreYarnAmounts,
     getSettings, saveSettings,
     getActiveSession, setActiveSession,
     getLastAction, setLastAction,

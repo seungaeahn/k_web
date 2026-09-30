@@ -199,7 +199,11 @@ const App = (() => {
     const parts = hash.split('/').filter(Boolean);
     if (parts.length === 0) return { name: 'list', params: {} };
     if (parts[0] === 'archive') return { name: 'archive', params: {} };
-    if (parts[0] === 'yarn') return { name: 'placeholder', params: { tab: 'yarn' } };
+    if (parts[0] === 'yarn') {
+      if (parts[1] === 'new') return { name: 'yarn-form', params: {} };
+      if (parts[1]) return { name: 'yarn-form', params: { id: parts[1] } };
+      return { name: 'yarn-list', params: {} };
+    }
     if (parts[0] === 'pattern') return { name: 'placeholder', params: { tab: 'pattern' } };
     if (parts[0] === 'tools') return { name: 'placeholder', params: { tab: 'tools' } };
     if (parts[0] === 'project') {
@@ -228,6 +232,8 @@ const App = (() => {
       case 'project-form': return renderProjectForm(route.params.id);
       case 'project-detail': return renderProjectDetail(route.params.id);
       case 'sessions': return renderSessions(route.params.id);
+      case 'yarn-list': return renderYarnList();
+      case 'yarn-form': return renderYarnForm(route.params.id);
       default: return renderList();
     }
   }
@@ -331,11 +337,222 @@ const App = (() => {
   // ---------- View: Placeholder tabs ----------
   function renderPlaceholder(tab) {
     setActiveTab(tab);
-    const titles = { yarn: '실', pattern: '도안', tools: '도구' };
+    const titles = { pattern: '도안', tools: '도구' };
     root.innerHTML = `
       <header class="page-header"><h1>${titles[tab]}</h1></header>
       ${emptyState('준비 중이에요', '다음 개발 단계에서 만나볼 수 있어요.')}
     `;
+  }
+
+  // ---------- View: Yarn List ----------
+  const YARN_WEIGHTS = ['레이스', '합연사', '중세', '합태', '극태', '특극태'];
+  let yarnActiveWeight = 'all';
+
+  function renderYarnList() {
+    setActiveTab('yarn');
+    yarnActiveWeight = 'all';
+    const usedWeights = Array.from(new Set(Storage.getYarns().map((y) => y.weight).filter(Boolean)));
+
+    root.innerHTML = `
+      <header class="page-header">
+        <h1>실</h1>
+        <button class="btn primary sm" data-action="new-yarn">+ 실 추가</button>
+      </header>
+      ${usedWeights.length ? `
+        <div class="status-row wrap" id="yarn-weight-filter">
+          <button type="button" class="chip active" data-weight="all">전체</button>
+          ${usedWeights.map((w) => `<button type="button" class="chip" data-weight="${Utils.escapeHtml(w)}">${Utils.escapeHtml(w)}</button>`).join('')}
+        </div>` : ''}
+      <label class="field">
+        <input type="text" id="yarn-search" placeholder="이름, 색상으로 검색">
+      </label>
+      <div class="list" id="yarn-list-body"></div>
+    `;
+
+    function renderBody() {
+      const q = root.querySelector('#yarn-search').value.trim().toLowerCase();
+      const list = Storage.getYarns()
+        .filter((y) => yarnActiveWeight === 'all' || y.weight === yarnActiveWeight)
+        .filter((y) => !q || `${y.name} ${y.color}`.toLowerCase().includes(q))
+        .sort((a, b) => {
+          const aEmpty = a.amount > 0 ? 0 : 1;
+          const bEmpty = b.amount > 0 ? 0 : 1;
+          if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+          return (b.createdAt || '').localeCompare(a.createdAt || '');
+        });
+      const body = root.querySelector('#yarn-list-body');
+      body.innerHTML = list.length === 0
+        ? emptyState('아직 등록한 실이 없어요', '실을 추가하고 보관함을 채워보세요.')
+        : list.map(yarnCard).join('');
+      body.querySelectorAll('[data-yarn-id]').forEach((el) => {
+        el.addEventListener('click', () => go(`#/yarn/${el.dataset.yarnId}`));
+      });
+    }
+
+    root.querySelector('[data-action="new-yarn"]').addEventListener('click', () => go('#/yarn/new'));
+    const filterRow = root.querySelector('#yarn-weight-filter');
+    if (filterRow) {
+      filterRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-weight]');
+        if (!btn) return;
+        yarnActiveWeight = btn.dataset.weight;
+        filterRow.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c === btn));
+        renderBody();
+      });
+    }
+    root.querySelector('#yarn-search').addEventListener('input', renderBody);
+
+    renderBody();
+  }
+
+  function yarnCard(y) {
+    const empty = !(y.amount > 0);
+    return `
+      <div class="card ${empty ? 'is-empty' : ''}" data-yarn-id="${y.id}">
+        <div class="card-thumb">${y.photo ? `<img src="${y.photo}" alt="">` : `<div class="thumb-placeholder">🧵</div>`}</div>
+        <div class="card-body">
+          <div class="card-title-row"><h3>${Utils.escapeHtml(y.name)}</h3></div>
+          <p class="card-sub">${[y.color, y.weight, y.material].filter(Boolean).map((v) => Utils.escapeHtml(v)).join(' · ') || '-'}</p>
+          <p class="card-meta">${empty ? '보유량 없음' : `보유 ${y.amount}볼`}</p>
+        </div>
+      </div>`;
+  }
+
+  // ---------- View: Yarn Form (create/edit) ----------
+  function renderYarnForm(id) {
+    const editing = !!id;
+    const yarn = editing ? Storage.getYarn(id) : null;
+    if (editing && !yarn) return go('#/yarn');
+    const linkedProjects = editing ? Storage.getProjectsLinkedToYarn(id) : [];
+
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1>${editing ? '실 수정' : '새 실'}</h1>
+      </header>
+      <form id="yarn-form" class="form">
+        <label class="field">
+          <span>브랜드/이름 <em>*</em></span>
+          <input type="text" name="name" value="${yarn ? Utils.escapeHtml(yarn.name) : ''}" placeholder="예: 메리노 DK">
+          <p class="field-error" id="name-error" hidden>이름을 입력해주세요.</p>
+        </label>
+        <label class="field">
+          <span>색상</span>
+          <input type="text" name="color" value="${yarn ? Utils.escapeHtml(yarn.color) : ''}" placeholder="예: 카멜">
+        </label>
+        <label class="field">
+          <span>굵기</span>
+          <select name="weight">
+            <option value="">선택 안 함</option>
+            ${YARN_WEIGHTS.map((w) => `<option value="${w}" ${yarn && yarn.weight === w ? 'selected' : ''}>${w}</option>`).join('')}
+          </select>
+        </label>
+        <label class="field">
+          <span>소재</span>
+          <input type="text" name="material" value="${yarn ? Utils.escapeHtml(yarn.material) : ''}" placeholder="예: 메리노 울 100%">
+        </label>
+        <label class="field">
+          <span>보유량 (볼 수)</span>
+          <input type="number" name="amount" min="0" step="1" value="${yarn ? yarn.amount : 0}">
+        </label>
+        <div class="grid-2">
+          <label class="field"><span>볼당 길이(m)</span><input type="number" name="lengthPerBall" min="0" value="${yarn && yarn.lengthPerBall != null ? yarn.lengthPerBall : ''}"></label>
+          <label class="field"><span>볼당 무게(g)</span><input type="number" name="weightPerBall" min="0" value="${yarn && yarn.weightPerBall != null ? yarn.weightPerBall : ''}"></label>
+        </div>
+        <div class="field">
+          <span>사진</span>
+          <div class="photo-grid" id="photo-grid"></div>
+        </div>
+        ${editing && linkedProjects.length ? `
+          <div class="info-block">
+            <h3>연결된 작품</h3>
+            <ul class="yarn-link-list">
+              ${linkedProjects.map((p) => {
+                const link = (p.yarns || []).find((l) => l.yarnId === id);
+                return `<li class="yarn-link-row"><span>${Utils.escapeHtml(p.name)} · ${link ? link.amount : 0}볼 사용</span></li>`;
+              }).join('')}
+            </ul>
+          </div>` : ''}
+        <div class="form-actions">
+          <button type="submit" class="btn primary block">저장</button>
+          ${editing ? `<button type="button" class="btn danger block" data-action="delete">실 삭제</button>` : ''}
+        </div>
+      </form>
+    `;
+
+    let photo = yarn ? yarn.photo || null : null;
+
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    function refreshPhotoGrid() {
+      const grid = root.querySelector('#photo-grid');
+      grid.innerHTML = (photo ? photoThumb(photo, 0) : '') +
+        (photo ? '' : `<label class="photo-add"><input type="file" id="photo-input" accept="image/*" hidden><span>+</span></label>`);
+      const input = grid.querySelector('#photo-input');
+      if (input) input.addEventListener('change', handlePhotoChange);
+      const removeBtn = grid.querySelector('[data-remove-photo]');
+      if (removeBtn) removeBtn.addEventListener('click', () => { photo = null; refreshPhotoGrid(); });
+    }
+    async function handlePhotoChange(e) {
+      const file = (e.target.files || [])[0];
+      if (!file) return;
+      try { photo = await resizeImage(file); } catch (err) { console.error(err); }
+      refreshPhotoGrid();
+    }
+    refreshPhotoGrid();
+
+    if (editing) {
+      root.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+        const linked = Storage.getProjectsLinkedToYarn(id);
+        const ok = await Modal.confirm(linked.length ? {
+          title: '연결된 작품이 있어요',
+          message: `${linked.map((p) => p.name).join(', ')}에 연결돼 있어요. 삭제해도 작품에는 실 이름이 남아요.`,
+          okLabel: '삭제',
+          cancelLabel: '취소',
+          danger: true,
+        } : {
+          title: '실을 삭제할까요?',
+          message: '삭제한 실 정보는 되돌릴 수 없어요.',
+          okLabel: '삭제',
+          cancelLabel: '취소',
+          danger: true,
+        });
+        if (!ok) return;
+        Storage.deleteYarn(id);
+        showBanner('실을 삭제했어요.');
+        go('#/yarn');
+      });
+    }
+
+    root.querySelector('#yarn-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const name = String(fd.get('name') || '').trim();
+      const errorEl = root.querySelector('#name-error');
+      if (!name) {
+        errorEl.hidden = false;
+        return;
+      }
+      errorEl.hidden = true;
+      const data = {
+        name,
+        color: String(fd.get('color') || '').trim(),
+        weight: String(fd.get('weight') || '').trim(),
+        material: String(fd.get('material') || '').trim(),
+        amount: Math.max(0, Number(fd.get('amount')) || 0),
+        lengthPerBall: fd.get('lengthPerBall') ? Number(fd.get('lengthPerBall')) : null,
+        weightPerBall: fd.get('weightPerBall') ? Number(fd.get('weightPerBall')) : null,
+        photo,
+      };
+      if (editing) {
+        Storage.updateYarn(id, data);
+        showBanner('실 정보를 수정했어요.');
+      } else {
+        Storage.createYarn(data);
+        showBanner('새 실을 등록했어요.');
+      }
+      go('#/yarn');
+    });
   }
 
   // ---------- View: Project Form (create/edit) ----------
@@ -430,6 +647,15 @@ const App = (() => {
           danger: true,
         });
         if (ok) {
+          if (project.yarns && project.yarns.length) {
+            const restore = await Modal.confirm({
+              title: '연결된 실이 있어요',
+              message: '차감했던 실 보유량을 되돌릴까요?',
+              okLabel: '되돌리기',
+              cancelLabel: '되돌리지 않기',
+            });
+            if (restore) Storage.restoreYarnAmounts(project);
+          }
           Storage.deleteProject(id);
           showBanner('작품을 삭제했어요.');
           go('#/');
@@ -564,6 +790,19 @@ const App = (() => {
             ${project.photos.map((src) => `<div class="photo-thumb"><img src="${src}" alt=""></div>`).join('')}
           </div>` : ''}
       </div>
+
+      <div class="info-block">
+        <h3>연결한 실</h3>
+        ${(project.yarns || []).length === 0 ? `<p class="card-meta">연결된 실이 없어요.</p>` : `
+          <ul class="yarn-link-list">
+            ${(project.yarns || []).map((l) => {
+              const liveYarn = Storage.getYarn(l.yarnId);
+              const label = liveYarn ? liveYarn.name : `${l.yarnName || '실'} (삭제됨)`;
+              return `<li class="yarn-link-row"><span>${Utils.escapeHtml(label)} · ${l.amount}볼</span><button type="button" class="icon-btn sm" data-unlink-yarn="${l.yarnId}">연결 해제</button></li>`;
+            }).join('')}
+          </ul>`}
+        <button type="button" class="btn ghost sm" data-action="link-yarn">+ 실 연결</button>
+      </div>
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => go('#/'));
@@ -604,6 +843,57 @@ const App = (() => {
         Storage.createCounter({ projectId: id, name });
         render();
       }
+    });
+
+    root.querySelectorAll('[data-unlink-yarn]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const yarnId = btn.dataset.unlinkYarn;
+        const restore = await Modal.confirm({
+          title: '연결을 해제할까요?',
+          message: '차감했던 보유량을 실 보관함으로 되돌릴까요?',
+          okLabel: '되돌리기',
+          cancelLabel: '되돌리지 않기',
+        });
+        Storage.unlinkYarnFromProject(id, yarnId, restore);
+        showBanner('실 연결을 해제했어요.');
+        render();
+      });
+    });
+
+    root.querySelector('[data-action="link-yarn"]').addEventListener('click', async () => {
+      const available = Storage.getYarns().filter((y) => !(project.yarns || []).some((l) => l.yarnId === y.id));
+      if (!available.length) {
+        showBanner('연결할 수 있는 실이 없어요.', 'warn');
+        return;
+      }
+      const res = await Modal.open({
+        title: '실 연결',
+        bodyHtml: `
+          <label class="field"><span>실 선택</span>
+            <select data-field="yarnId">
+              ${available.map((y) => `<option value="${y.id}">${Utils.escapeHtml(y.name)} (보유 ${y.amount}볼)</option>`).join('')}
+            </select>
+          </label>
+          <label class="field"><span>사용할 볼 수</span><input type="number" data-field="amount" min="0" step="1" value="1"></label>
+        `,
+        buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '연결', variant: 'primary' }],
+      });
+      if (res.id !== 'ok') return;
+      const yarnId = res.values.yarnId;
+      const amount = Math.max(0, Number(res.values.amount) || 0);
+      const yarn = Storage.getYarn(yarnId);
+      if (yarn && amount > yarn.amount) {
+        const proceed = await Modal.confirm({
+          title: '보유량보다 많아요',
+          message: '보유량보다 많이 사용하면 실 보유량은 0이 돼요. 계속할까요?',
+          okLabel: '계속',
+          cancelLabel: '취소',
+        });
+        if (!proceed) return;
+      }
+      Storage.linkYarnToProject(id, yarnId, amount);
+      showBanner('실을 연결했어요.');
+      render();
     });
   }
 
