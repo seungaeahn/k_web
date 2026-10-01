@@ -11,7 +11,7 @@ const Storage = (() => {
     lastAction: 'kw_last_action',
   };
 
-  const DEFAULT_SETTINGS = { autoEndMinutes: 15, lastBackupAt: null };
+  const DEFAULT_SETTINGS = { autoEndMinutes: 15, lastBackupAt: null, ravelryKey: '', ravelrySecret: '' };
 
   const DEFAULT_ABBREVIATIONS = [
     { term: 'k', desc: '겉뜨기' },
@@ -207,6 +207,7 @@ const Storage = (() => {
       lengthPerBall: data.lengthPerBall != null && data.lengthPerBall !== '' ? Number(data.lengthPerBall) : null,
       weightPerBall: data.weightPerBall != null && data.weightPerBall !== '' ? Number(data.weightPerBall) : null,
       photo: data.photo || null,
+      ravelryYarnId: data.ravelryYarnId || null,
       createdAt: new Date().toISOString(),
     };
     yarns.push(yarn);

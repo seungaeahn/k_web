@@ -214,6 +214,7 @@ const App = (() => {
       if (parts[1] === 'gauge') return { name: 'tools-gauge', params: {} };
       if (parts[1] === 'abbreviations') return { name: 'tools-abbr', params: {} };
       if (parts[1] === 'backup') return { name: 'tools-backup', params: {} };
+      if (parts[1] === 'ravelry') return { name: 'tools-ravelry', params: {} };
       return { name: 'tools-home', params: {} };
     }
     if (parts[0] === 'project') {
@@ -247,6 +248,7 @@ const App = (() => {
       case 'tools-gauge': return renderGaugeCalculator();
       case 'tools-abbr': return renderAbbreviations();
       case 'tools-backup': return renderBackup();
+      case 'tools-ravelry': return renderRavelrySettings();
       case 'pattern-list': return renderPatternList();
       case 'pattern-form': return renderPatternForm();
       case 'pattern-viewer': return renderPatternViewer(route.params.id, route.params.projectId);
@@ -443,6 +445,12 @@ const App = (() => {
           <input type="text" name="name" value="${yarn ? Utils.escapeHtml(yarn.name) : ''}" placeholder="예: 메리노 DK">
           <p class="field-error" id="name-error" hidden>이름을 입력해주세요.</p>
         </label>
+        ${Ravelry.isConfigured() ? `
+          <div class="info-block" id="ravelry-search-block">
+            <button type="button" class="btn ghost sm" data-action="ravelry-search">Ravelry에서 찾아서 정보 채우기</button>
+            <div class="list" id="ravelry-results"></div>
+          </div>
+        ` : `<p class="card-meta">Ravelry 연동을 설정하면 위 이름으로 실 정보를 자동으로 불러올 수 있어요. <a href="#/tools/ravelry">설정하러 가기 →</a></p>`}
         <label class="field">
           <span>색상</span>
           <input type="text" name="color" value="${yarn ? Utils.escapeHtml(yarn.color) : ''}" placeholder="예: 카멜">
@@ -488,8 +496,59 @@ const App = (() => {
     `;
 
     let photo = yarn ? yarn.photo || null : null;
+    let ravelryYarnId = yarn ? yarn.ravelryYarnId || null : null;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    const ravelrySearchBtn = root.querySelector('[data-action="ravelry-search"]');
+    if (ravelrySearchBtn) {
+      ravelrySearchBtn.addEventListener('click', async () => {
+        const query = root.querySelector('[name="name"]').value.trim();
+        const resultsEl = root.querySelector('#ravelry-results');
+        if (!query) {
+          showBanner('먼저 이름을 입력해주세요.', 'warn');
+          return;
+        }
+        resultsEl.innerHTML = `<p class="card-meta">검색 중이에요...</p>`;
+        let results;
+        try {
+          results = await Ravelry.searchYarns(query);
+        } catch (err) {
+          resultsEl.innerHTML = '';
+          showBanner(Ravelry.errorMessage(err), 'warn');
+          return;
+        }
+        if (!results.length) {
+          resultsEl.innerHTML = `<p class="card-meta">검색 결과가 없어요.</p>`;
+          return;
+        }
+        resultsEl.innerHTML = results.map((r) => `
+          <div class="counter-row" data-ravelry-yarn="${r.id}">
+            <div class="counter-row-main">
+              <strong>${Utils.escapeHtml(r.name)}</strong>
+              <span class="card-sub">${Utils.escapeHtml(r.company)}</span>
+            </div>
+            <div class="counter-row-controls"><button type="button" class="icon-btn sm">불러오기</button></div>
+          </div>`).join('');
+        resultsEl.querySelectorAll('[data-ravelry-yarn]').forEach((row) => {
+          row.addEventListener('click', async () => {
+            try {
+              const detail = await Ravelry.getYarnDetail(row.dataset.ravelryYarn);
+              root.querySelector('[name="name"]').value = detail.name;
+              if (detail.weight) root.querySelector('[name="weight"]').value = detail.weight;
+              if (detail.material) root.querySelector('[name="material"]').value = detail.material;
+              if (detail.lengthPerBall != null) root.querySelector('[name="lengthPerBall"]').value = detail.lengthPerBall;
+              if (detail.weightPerBall != null) root.querySelector('[name="weightPerBall"]').value = detail.weightPerBall;
+              ravelryYarnId = detail.ravelryYarnId;
+              resultsEl.innerHTML = '';
+              showBanner('실 정보를 불러왔어요.');
+            } catch (err) {
+              showBanner(Ravelry.errorMessage(err), 'warn');
+            }
+          });
+        });
+      });
+    }
 
     function refreshPhotoGrid() {
       const grid = root.querySelector('#photo-grid');
@@ -550,6 +609,7 @@ const App = (() => {
         lengthPerBall: fd.get('lengthPerBall') ? Number(fd.get('lengthPerBall')) : null,
         weightPerBall: fd.get('weightPerBall') ? Number(fd.get('weightPerBall')) : null,
         photo,
+        ravelryYarnId,
       };
       if (editing) {
         Storage.updateYarn(id, data);
@@ -570,6 +630,7 @@ const App = (() => {
       <a class="link-row" href="#/tools/gauge">게이지 계산기 →</a>
       <a class="link-row" href="#/tools/abbreviations">약어 사전 →</a>
       <a class="link-row" href="#/tools/backup">백업 (내보내기/가져오기) →</a>
+      <a class="link-row" href="#/tools/ravelry">Ravelry 연동 설정 →</a>
     `;
   }
 
@@ -865,6 +926,66 @@ const App = (() => {
         showBanner('백업 파일을 읽을 수 없어요.', 'warn');
       } finally {
         e.target.value = '';
+      }
+    });
+  }
+
+  // ---------- View: Ravelry Settings ----------
+  function renderRavelrySettings() {
+    setActiveTab('tools');
+    const settings = Storage.getSettings();
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1>Ravelry 연동</h1>
+      </header>
+      <div class="info-block">
+        <p class="card-meta">
+          실 정보를 Ravelry에서 불러오려면 개인용 API 키가 필요해요.
+          아직 없다면 <a href="https://www.ravelry.com/pro/developer" target="_blank" rel="noopener">Ravelry 개발자 페이지</a>에서
+          개인용 읽기 전용(read-only) 키를 발급받아 아래에 입력해주세요.
+        </p>
+      </div>
+      <form id="ravelry-form" class="form">
+        <label class="field">
+          <span>API 액세스 키</span>
+          <input type="text" name="ravelryKey" value="${Utils.escapeHtml(settings.ravelryKey || '')}" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>API 시크릿</span>
+          <input type="password" name="ravelrySecret" value="${Utils.escapeHtml(settings.ravelrySecret || '')}" autocomplete="off">
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn primary block">저장</button>
+          <button type="button" class="btn ghost block" data-action="test-connection">연결 테스트</button>
+        </div>
+      </form>
+      <p class="card-meta">이 앱은 Ravelry에서 만들거나 제휴·보증한 앱이 아니에요. 키와 시크릿은 이 기기에만 저장되고 Ravelry API 호출에만 사용돼요.</p>
+    `;
+
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    root.querySelector('#ravelry-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      Storage.saveSettings({
+        ravelryKey: String(fd.get('ravelryKey') || '').trim(),
+        ravelrySecret: String(fd.get('ravelrySecret') || '').trim(),
+      });
+      showBanner('Ravelry 설정을 저장했어요.');
+    });
+
+    root.querySelector('[data-action="test-connection"]').addEventListener('click', async () => {
+      const fd = new FormData(root.querySelector('#ravelry-form'));
+      Storage.saveSettings({
+        ravelryKey: String(fd.get('ravelryKey') || '').trim(),
+        ravelrySecret: String(fd.get('ravelrySecret') || '').trim(),
+      });
+      try {
+        await Ravelry.testConnection();
+        showBanner('연결됐어요!');
+      } catch (err) {
+        showBanner(Ravelry.errorMessage(err), 'warn');
       }
     });
   }
