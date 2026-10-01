@@ -22,6 +22,25 @@ const Ravelry = (() => {
     return WEIGHT_MAP[name.toLowerCase().trim()] || '';
   }
 
+  const WEIGHT_SEARCH_TERM = {
+    레이스: 'lace',
+    합연사: 'fingering',
+    중세: 'dk',
+    합태: 'worsted',
+    극태: 'bulky',
+    특극태: 'super bulky',
+  };
+
+  const PATTERN_TYPES = [
+    { ko: '목도리', en: 'scarf' },
+    { ko: '모자', en: 'hat' },
+    { ko: '스웨터', en: 'sweater' },
+    { ko: '가디건', en: 'cardigan' },
+    { ko: '숄', en: 'shawl' },
+    { ko: '장갑', en: 'mittens' },
+    { ko: '양말', en: 'socks' },
+  ];
+
   function makeError(code) {
     const err = new Error(code);
     err.code = code;
@@ -96,6 +115,58 @@ const Ravelry = (() => {
     };
   }
 
+  async function searchPatterns({ typeTerm, weight, craft, freeOnly, ravelryYarnId, page = 1 } = {}) {
+    const params = new URLSearchParams();
+    if (ravelryYarnId) {
+      // Yarn is linked to a specific Ravelry yarn record: prioritize patterns
+      // actually made with that yarn, per PRD 6.10's recommendation order.
+      params.set('yarn_ids', String(ravelryYarnId));
+      if (typeTerm) params.set('query', typeTerm);
+    } else {
+      // Not linked to Ravelry (e.g. a domestic/local yarn): fall back to
+      // searching by weight + pattern type.
+      const terms = [typeTerm, weight ? WEIGHT_SEARCH_TERM[weight] : ''].filter(Boolean);
+      params.set('query', terms.join(' ') || '*');
+    }
+    if (craft) params.set('craft', craft);
+    if (freeOnly) params.set('availability', 'free');
+    params.set('photo', 'yes');
+    params.set('sort', 'favorites');
+    params.set('page_size', '10');
+    params.set('page', String(page));
+
+    const data = await request(`/patterns/search.json?${params.toString()}`);
+    const basics = (data.patterns || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      designer: (p.designer && p.designer.name) || (p.pattern_author && p.pattern_author.name) || '',
+      free: !!p.free,
+      thumbnail: p.first_photo
+        ? (p.first_photo.small2_url || p.first_photo.small_url || p.first_photo.thumbnail_url)
+        : null,
+      url: `https://www.ravelry.com/patterns/library/${p.permalink}`,
+    }));
+
+    const detailed = await Promise.all(basics.map(async (b) => {
+      try {
+        const d = await request(`/patterns/${b.id}.json`);
+        const yd = d.pattern || {};
+        const yardsMin = yd.yardage || null;
+        const yardsMax = yd.yardage_max || yd.yardage || null;
+        return {
+          ...b,
+          metersMin: yardsMin ? Math.round(yardsMin * 0.9144) : null,
+          metersMax: yardsMax ? Math.round(yardsMax * 0.9144) : null,
+        };
+      } catch (e) {
+        return { ...b, metersMin: null, metersMax: null };
+      }
+    }));
+
+    const paginator = data.paginator || {};
+    return { items: detailed, hasMore: page < (paginator.last_page || paginator.page_count || page) };
+  }
+
   function errorMessage(err) {
     switch (err && err.code) {
       case 'offline':
@@ -110,5 +181,5 @@ const Ravelry = (() => {
     }
   }
 
-  return { isConfigured, testConnection, searchYarns, getYarnDetail, errorMessage };
+  return { isConfigured, testConnection, searchYarns, getYarnDetail, searchPatterns, errorMessage, PATTERN_TYPES };
 })();

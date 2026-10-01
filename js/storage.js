@@ -5,6 +5,7 @@ const Storage = (() => {
     sessions: 'kw_sessions',
     yarns: 'kw_yarns',
     patterns: 'kw_patterns',
+    savedPatterns: 'kw_saved_patterns',
     abbreviations: 'kw_abbreviations',
     settings: 'kw_settings',
     activeSession: 'kw_active_session',
@@ -358,6 +359,35 @@ const Storage = (() => {
     return updateProject(projectId, { highlight });
   }
 
+  // ---- Saved (favorited) Ravelry patterns ----
+  function getSavedPatterns() {
+    return read(KEYS.savedPatterns, []);
+  }
+  function saveSavedPatterns(list) {
+    return write(KEYS.savedPatterns, list);
+  }
+  function isPatternSaved(ravelryPatternId) {
+    return getSavedPatterns().some((p) => p.ravelryPatternId === ravelryPatternId);
+  }
+  function saveFavoritePattern(data) {
+    const list = getSavedPatterns();
+    if (list.some((p) => p.ravelryPatternId === data.ravelryPatternId)) return null;
+    const rec = {
+      id: Utils.uid(),
+      ravelryPatternId: data.ravelryPatternId,
+      name: data.name,
+      photoUrl: data.photoUrl || null,
+      url: data.url,
+      savedAt: new Date().toISOString(),
+    };
+    list.push(rec);
+    saveSavedPatterns(list);
+    return rec;
+  }
+  function unfavoritePattern(ravelryPatternId) {
+    saveSavedPatterns(getSavedPatterns().filter((p) => p.ravelryPatternId !== ravelryPatternId));
+  }
+
   // ---- Backup ----
   function exportBackup(includePhotos) {
     const projects = getProjects().map((p) => (includePhotos ? p : { ...p, photos: [], mainPhotoIndex: 0 }));
@@ -433,6 +463,7 @@ const Storage = (() => {
     getMissingDefaultAbbreviations, restoreDefaultAbbreviations,
     getPatterns, getPattern, createPattern, updatePattern, deletePattern,
     getProjectsLinkedToPattern, linkPatternToProject, unlinkPatternFromProject, saveProjectHighlight,
+    getSavedPatterns, isPatternSaved, saveFavoritePattern, unfavoritePattern,
     exportBackup, importBackup,
     getSettings, saveSettings,
     getActiveSession, setActiveSession,
