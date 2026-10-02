@@ -292,7 +292,7 @@ const App = (() => {
       </header>
       ${projects.length === 0
         ? emptyState('아직 작품이 없어요', '새 작품을 추가해서 뜨개를 시작해보세요.', 'sweater')
-        : [['active', '진행 중'], ['onhold', '보류']].map(([status, label]) => {
+        : [['active', 'WIP'], ['onhold', 'UFO']].map(([status, label]) => {
           const group = projects.filter((p) => p.status === status);
           if (!group.length) return '';
           return `
@@ -301,7 +301,7 @@ const App = (() => {
               <div class="list">${group.map(projectCard).join('')}</div>
             </section>`;
         }).join('')}
-      ${completedCount > 0 ? `<div class="list-footer-pill"><a class="pill-link" href="#/archive">완성한 작품 ${completedCount}개</a></div>` : ''}
+      ${completedCount > 0 ? `<div class="list-footer-pill"><a class="pill-link" href="#/archive">FO ${completedCount}개</a></div>` : ''}
     `;
 
     root.querySelector('[data-action="new-project"]').addEventListener('click', () => go('#/project/new'));
@@ -356,7 +356,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header"><h1>Archive</h1></header>
       <div class="archive-summary">
-        <div><strong>${projects.length}</strong><span>완성작</span></div>
+        <div><strong>${projects.length}</strong><span>FO</span></div>
         <div><strong>${Utils.formatDuration(totalMs)}</strong><span>총 뜨개 시간</span></div>
       </div>
       <div class="grid-2">
@@ -372,7 +372,7 @@ const App = (() => {
     const cover = p.photos && p.photos[p.mainPhotoIndex || 0];
     return `
       <div class="card archive-card" data-project-id="${p.id}">
-        <div class="card-thumb square">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('project')}</div>`}</div>
+        <div class="card-thumb square">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-stitch is-archive">${Icons.stitch('sweater', 0.3)}</div>`}</div>
         <div class="card-body">
           <h3>${Utils.escapeHtml(p.name)}</h3>
           <p class="card-meta">${Utils.formatDate(p.completedDate)}</p>
@@ -382,7 +382,7 @@ const App = (() => {
 
   // ---------- View: Placeholder tabs ----------
   // ---------- View: Yarn List ----------
-  const YARN_WEIGHTS = ['레이스', '합연사', '중세', '합태', '극태', '특극태'];
+  const YARN_WEIGHTS = ['Lace', 'Fingering', 'Sport', 'DK', 'Worsted', 'Aran', 'Bulky', 'Super Bulky'];
   let yarnActiveWeight = 'all';
 
   function renderYarnList() {
@@ -397,8 +397,8 @@ const App = (() => {
       </header>
       ${usedWeights.length ? `
         <div class="status-row wrap" id="yarn-weight-filter">
-          <button type="button" class="chip active" data-weight="all">전체</button>
-          ${usedWeights.map((w) => `<button type="button" class="chip" data-weight="${Utils.escapeHtml(w)}">${Utils.escapeHtml(w)}</button>`).join('')}
+          <button type="button" class="chip display-chip active" data-weight="all">All</button>
+          ${usedWeights.map((w) => `<button type="button" class="chip display-chip" data-weight="${Utils.escapeHtml(w)}">${Utils.escapeHtml(w)}</button>`).join('')}
         </div>` : ''}
       <label class="field search-field">
         <input type="text" id="yarn-search" placeholder="이름, 색상으로 검색">
@@ -446,11 +446,11 @@ const App = (() => {
     const empty = !(y.amount > 0);
     return `
       <div class="card ${empty ? 'is-empty' : ''}" data-yarn-id="${y.id}">
-        <div class="card-thumb">${y.photo ? `<img src="${y.photo}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('yarn')}</div>`}</div>
+        <div class="card-thumb">${y.photo ? `<img src="${y.photo}" alt="">` : `<div class="thumb-stitch is-yarn">${Icons.stitch('yarn', 0.4)}</div>`}</div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(y.name)}</h3></div>
           <p class="card-sub">${[y.color, y.weight, y.material].filter(Boolean).map((v) => Utils.escapeHtml(v)).join(' · ') || '-'}</p>
-          <p class="card-meta">${empty ? '보유량 없음' : `보유 ${y.amount}볼`}</p>
+          <p class="card-meta">${[empty ? '보유량 없음' : `보유 ${y.amount}볼`, y.needleSize && `바늘 ${Utils.escapeHtml(y.needleSize)}`].filter(Boolean).join(' · ')}</p>
         </div>
       </div>`;
   }
@@ -491,6 +491,10 @@ const App = (() => {
             <option value="">선택 안 함</option>
             ${YARN_WEIGHTS.map((w) => `<option value="${w}" ${yarn && yarn.weight === w ? 'selected' : ''}>${w}</option>`).join('')}
           </select>
+        </label>
+        <label class="field">
+          <span>권장 바늘</span>
+          <input type="text" name="needleSize" value="${yarn ? Utils.escapeHtml(yarn.needleSize || '') : ''}" placeholder="예: 4–4.5mm">
         </label>
         <label class="field">
           <span>소재</span>
@@ -570,6 +574,7 @@ const App = (() => {
               if (detail.material) root.querySelector('[name="material"]').value = detail.material;
               if (detail.lengthPerBall != null) root.querySelector('[name="lengthPerBall"]').value = detail.lengthPerBall;
               if (detail.weightPerBall != null) root.querySelector('[name="weightPerBall"]').value = detail.weightPerBall;
+              if (detail.needleSize) root.querySelector('[name="needleSize"]').value = detail.needleSize;
               ravelryYarnId = detail.ravelryYarnId;
               resultsEl.innerHTML = '';
               showBanner('실 정보를 불러왔어요.');
@@ -641,6 +646,7 @@ const App = (() => {
         name,
         color: String(fd.get('color') || '').trim(),
         weight: String(fd.get('weight') || '').trim(),
+        needleSize: String(fd.get('needleSize') || '').trim(),
         material: String(fd.get('material') || '').trim(),
         amount: Math.max(0, Number(fd.get('amount')) || 0),
         lengthPerBall: fd.get('lengthPerBall') ? Number(fd.get('lengthPerBall')) : null,
@@ -664,10 +670,18 @@ const App = (() => {
     setActiveTab('tools');
     root.innerHTML = `
       <header class="page-header"><h1>Tools</h1></header>
-      <a class="link-row" href="#/tools/gauge">게이지 계산기 →</a>
-      <a class="link-row" href="#/tools/abbreviations">약어 사전 →</a>
-      <a class="link-row" href="#/tools/backup">백업 (내보내기/가져오기) →</a>
-      <a class="link-row" href="#/tools/ravelry">Ravelry 연동 설정 →</a>
+      <nav class="tools-menu">
+        ${[
+          ['#/tools/gauge', 'Gauge Calculator', '게이지로 코·단 수 계산'],
+          ['#/tools/abbreviations', 'Abbreviations', '뜨개 약어 사전'],
+          ['#/tools/backup', 'Backup', '데이터 내보내기 / 가져오기'],
+          ['#/tools/ravelry', 'Ravelry', 'Ravelry 연동 설정'],
+        ].map(([href, title, sub]) => `
+          <a class="tools-menu-item" href="${href}">
+            <span class="tools-menu-text"><span class="tools-menu-title">${title}</span><span class="tools-menu-sub">${sub}</span></span>
+            <span class="tools-menu-arrow" aria-hidden="true">→</span>
+          </a>`).join('')}
+      </nav>
     `;
   }
 
@@ -681,7 +695,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
-        <h1>게이지 계산기</h1>
+        <h1 class="display-title">Gauge Calculator</h1>
       </header>
       <form id="gauge-form" class="form">
         <div class="grid-2">
@@ -784,7 +798,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
-        <h1>약어 사전</h1>
+        <h1 class="display-title">Abbreviations</h1>
         <button class="btn primary sm" data-action="new-abbr">+ 추가</button>
       </header>
       <label class="field search-field"><input type="text" id="abbr-search" placeholder="약어, 설명 검색"></label>
@@ -890,7 +904,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
-        <h1>백업</h1>
+        <h1 class="display-title">Backup</h1>
       </header>
       <div class="info-block">
         <h3>마지막 백업</h3>
@@ -974,7 +988,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
-        <h1>Ravelry 연동</h1>
+        <h1 class="display-title">Ravelry</h1>
       </header>
       <div class="info-block">
         <p class="card-meta">
@@ -1051,8 +1065,8 @@ const App = (() => {
         <button class="btn primary sm" data-action="new-pattern">+ Add Pattern</button>
       </header>
       <div class="status-row" id="pattern-tab-switch">
-        <button type="button" class="chip ${tab === 'owned' ? 'active' : ''}" data-tab="owned">소장 도안</button>
-        <button type="button" class="chip ${tab === 'saved' ? 'active' : ''}" data-tab="saved">찜한 도안</button>
+        <button type="button" class="chip display-chip ${tab === 'owned' ? 'active' : ''}" data-tab="owned">Library</button>
+        <button type="button" class="chip display-chip ${tab === 'saved' ? 'active' : ''}" data-tab="saved">Favorites</button>
       </div>
       <div class="list" id="pattern-tab-body"></div>
     `;
@@ -1069,7 +1083,7 @@ const App = (() => {
       });
     } else {
       body.innerHTML = saved.length === 0
-        ? emptyState('찜한 도안이 없어요', '실 보관함에서 "이 실로 뜰 도안 찾기"로 찜해보세요.')
+        ? emptyState('Favorites가 비어 있어요', '실 보관함에서 "이 실로 뜰 도안 찾기"로 찜해보세요.')
         : saved.map(savedPatternCard).join('');
       body.querySelectorAll('[data-unfavorite]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -1087,15 +1101,30 @@ const App = (() => {
     });
   }
 
+  // 찜 버튼: 찜하면 꽉 찬 하트, 아니면 빈 하트
+  function heartButton(saved, attrs) {
+    return `<button type="button" class="heart-btn ${saved ? 'is-saved' : ''}" ${attrs}
+      aria-pressed="${saved}" aria-label="${saved ? '찜 해제' : '찜하기'}">${Icons.svg(saved ? 'heart' : 'heart-outline')}</button>`;
+  }
+  function setHeart(btn, saved) {
+    btn.classList.toggle('is-saved', saved);
+    btn.setAttribute('aria-pressed', String(saved));
+    btn.setAttribute('aria-label', saved ? '찜 해제' : '찜하기');
+    btn.innerHTML = Icons.svg(saved ? 'heart' : 'heart-outline');
+  }
+
   function savedPatternCard(p) {
     return `
       <div class="card">
-        <div class="card-thumb">${p.photoUrl ? `<img src="${p.photoUrl}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('pattern')}</div>`}</div>
+        <div class="card-thumb">${p.photoUrl ? `<img src="${p.photoUrl}" alt="">` : `<div class="thumb-stitch is-pattern">${Icons.stitch('pattern', 0.4)}</div>`}</div>
         <div class="card-body">
-          <div class="card-title-row"><h3>${Utils.escapeHtml(p.name)}</h3></div>
+          <div class="card-title-row">
+            <h3>${Utils.escapeHtml(p.name)}</h3>
+            ${heartButton(true, `data-unfavorite="${p.ravelryPatternId}"`)}
+          </div>
+          ${p.needleSize ? `<p class="card-meta">바늘 ${Utils.escapeHtml(p.needleSize)}</p>` : ''}
           <div class="counter-controls">
             <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry</a>
-            <button type="button" class="btn danger sm" data-unfavorite="${p.ravelryPatternId}">찜 해제</button>
           </div>
         </div>
       </div>`;
@@ -1104,10 +1133,10 @@ const App = (() => {
   function patternCard(pt) {
     return `
       <div class="card" data-pattern-id="${pt.id}">
-        <div class="card-thumb"><div class="thumb-placeholder">${Icons.svg(pt.fileType === 'pdf' ? 'pattern' : 'image')}</div></div>
+        <div class="card-thumb"><div class="thumb-stitch is-pattern">${Icons.stitch('pattern', 0.4)}</div></div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(pt.name)}</h3></div>
-          <p class="card-sub">${pt.fileType === 'pdf' ? `PDF · ${pt.pageCount}페이지` : '이미지'}</p>
+          <p class="card-sub">${[pt.fileType === 'pdf' ? `PDF · ${pt.pageCount}페이지` : '이미지', pt.needleSize && `바늘 ${Utils.escapeHtml(pt.needleSize)}`].filter(Boolean).join(' · ')}</p>
         </div>
       </div>`;
   }
@@ -1127,10 +1156,29 @@ const App = (() => {
           <p class="field-error" id="name-error" hidden>이름을 입력해주세요.</p>
         </label>
         <label class="field">
-          <span>파일 (이미지 또는 PDF, 최대 20MB)</span>
-          <input type="file" id="pattern-file" accept="image/jpeg,image/png,application/pdf">
-          <p class="field-error" id="file-error" hidden></p>
+          <span>바늘 굵기</span>
+          <input type="text" name="needleSize" placeholder="예: 4mm (선택)">
         </label>
+        <div class="field">
+          <span>도안 파일 <em>*</em></span>
+          <label class="file-drop" id="file-drop">
+            <input type="file" id="pattern-file" accept="image/jpeg,image/png,application/pdf" hidden>
+            <div class="file-drop-empty">
+              <div class="file-drop-icon">${Icons.stitch('pattern', 0.4)}</div>
+              <strong>도안 파일 선택</strong>
+              <div class="file-drop-hint">이미지(JPG, PNG) 또는 PDF · 최대 20MB</div>
+            </div>
+            <div class="file-drop-picked" hidden>
+              <div class="file-drop-thumb"></div>
+              <div class="file-drop-info">
+                <strong class="file-drop-name"></strong>
+                <div class="file-drop-meta"></div>
+              </div>
+              <div class="file-drop-change">변경</div>
+            </div>
+          </label>
+          <p class="field-error" id="file-error" hidden></p>
+        </div>
         <div class="form-actions">
           <button type="submit" class="btn primary block" id="pattern-submit" disabled>저장</button>
         </div>
@@ -1142,14 +1190,41 @@ const App = (() => {
     let pendingFile = null;
     let pendingMeta = null;
 
-    root.querySelector('#pattern-file').addEventListener('change', async (e) => {
-      const file = e.target.files && e.target.files[0];
+    const drop = root.querySelector('#file-drop');
+    const emptyEl = drop.querySelector('.file-drop-empty');
+    const pickedEl = drop.querySelector('.file-drop-picked');
+    let previewUrl = null;
+
+    function showPicked(file, metaText) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+      drop.querySelector('.file-drop-thumb').innerHTML = previewUrl ? `<img src="${previewUrl}" alt="">` : Icons.stitch('pattern', 0.38);
+      drop.querySelector('.file-drop-name').textContent = file.name;
+      drop.querySelector('.file-drop-meta').textContent = metaText;
+      emptyEl.hidden = true;
+      pickedEl.hidden = false;
+      drop.classList.add('has-file');
+      // 이름을 아직 안 적었으면 파일 이름으로 채워줌
+      const nameInput = root.querySelector('[name="name"]');
+      if (!nameInput.value.trim()) nameInput.value = file.name.replace(/\.[^.]+$/, '');
+    }
+
+    function resetPicked() {
+      emptyEl.hidden = false;
+      pickedEl.hidden = true;
+      drop.classList.remove('has-file');
+    }
+
+    const formatSize = (bytes) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(bytes / 1024))}KB`);
+
+    async function handleFile(file) {
       const errorEl = root.querySelector('#file-error');
       const submitBtn = root.querySelector('#pattern-submit');
       errorEl.hidden = true;
       submitBtn.disabled = true;
       pendingFile = null;
       pendingMeta = null;
+      resetPicked();
       if (!file) return;
 
       if (file.size > PATTERN_MAX_BYTES) {
@@ -1165,6 +1240,7 @@ const App = (() => {
           pendingFile = file;
           pendingMeta = { fileType: 'pdf', fileSize: file.size, pageCount: pdf.numPages };
           submitBtn.disabled = false;
+          showPicked(file, `PDF · ${pdf.numPages}쪽 · ${formatSize(file.size)}`);
         } catch (err) {
           console.error(err);
           errorEl.textContent = '이 PDF를 열 수 없어요. 암호가 걸려있거나 손상된 파일일 수 있어요.';
@@ -1174,11 +1250,25 @@ const App = (() => {
         pendingFile = file;
         pendingMeta = { fileType: 'image', fileSize: file.size, pageCount: 1 };
         submitBtn.disabled = false;
+        showPicked(file, `이미지 · ${formatSize(file.size)}`);
       } else {
         errorEl.textContent = '이미지(JPG, PNG) 또는 PDF 파일만 올릴 수 있어요.';
         errorEl.hidden = false;
       }
+    }
+
+    root.querySelector('#pattern-file').addEventListener('change', (e) => {
+      handleFile(e.target.files && e.target.files[0]);
     });
+    // PC에서는 끌어다 놓기도 됨
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-dragover'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('is-dragover'));
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('is-dragover');
+      handleFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
+    viewCleanup = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
 
     root.querySelector('#pattern-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1191,7 +1281,7 @@ const App = (() => {
       }
       nameError.hidden = true;
       if (!pendingFile || !pendingMeta) return;
-      const created = Storage.createPattern({ name, ...pendingMeta });
+      const created = Storage.createPattern({ name, needleSize: String(fd.get('needleSize') || '').trim(), ...pendingMeta });
       await FileStore.put(created.id, pendingFile);
       showBanner('도안을 추가했어요.');
       go(`#/pattern/${created.id}`);
@@ -1199,6 +1289,15 @@ const App = (() => {
   }
 
   // ---------- View: Pattern Viewer ----------
+  // 하이라이트 줄 색: 디자인 시스템 팔레트에서 5가지 (fill은 반투명, line은 위아래 테두리)
+  const HIGHLIGHT_COLORS = [
+    { id: 'slate', label: '슬레이트 블루', fill: 'rgba(62,101,119,.22)', line: '#3E6577' },
+    { id: 'butter', label: '버터 노랑', fill: 'rgba(232,185,49,.32)', line: '#C9971A' },
+    { id: 'mint', label: '민트', fill: 'rgba(94,140,110,.25)', line: '#5E8C6E' },
+    { id: 'brick', label: '벽돌', fill: 'rgba(192,65,59,.2)', line: '#C0413B' },
+    { id: 'label', label: '라벨 블루', fill: 'rgba(46,123,176,.22)', line: '#2E7BB0' },
+  ];
+
   function renderPatternViewer(patternId, projectId) {
     setActiveTab('pattern');
     revokePatternObjectUrl();
@@ -1206,6 +1305,9 @@ const App = (() => {
     if (!pattern) return go('#/pattern');
     const project = projectId ? Storage.getProject(projectId) : null;
     const initial = (project && project.highlight) || { page: 1, y: 0.5, barThickness: 40 };
+    const projectCounters = project ? Storage.getCountersByProject(project.id) : [];
+    const viewerCounter = projectCounters.find((c) => c.isDefault) || projectCounters[0] || null;
+    let highlightColorId = Storage.getSettings().highlightColor || 'slate';
 
     root.innerHTML = `
       <header class="page-header with-back">
@@ -1235,17 +1337,57 @@ const App = (() => {
       <div class="pattern-toolbar">
         <div class="pattern-toolbar-group">
           <span class="t-caption">두께</span>
-          <input type="range" id="thickness-range" min="16" max="120" step="4" value="${initial.barThickness}">
+          <input type="range" id="thickness-range" min="6" max="120" step="2" value="${initial.barThickness}">
+        </div>
+        <div class="pattern-toolbar-group highlight-swatches" role="radiogroup" aria-label="하이라이트 색">
+          ${HIGHLIGHT_COLORS.map((c) => `
+            <button type="button" class="swatch" role="radio" data-highlight-color="${c.id}" aria-label="${c.label}"
+              aria-checked="${c.id === highlightColorId ? 'true' : 'false'}" style="--swatch:${c.line}"></button>`).join('')}
         </div>
         <div class="pattern-toolbar-group">
           <button type="button" class="icon-btn" data-action="move-up">▲</button>
           <button type="button" class="icon-btn" data-action="move-down">▼</button>
         </div>
       </div>
-      ${!project ? `<p class="card-meta" style="text-align:center;margin-top:8px">작품에 연결하면 하이라이트 위치가 저장돼요.</p>` : ''}
+      ${viewerCounter ? `
+        <div class="viewer-counter" data-counter-id="${viewerCounter.id}">
+          <button type="button" class="btn ghost" data-action="viewer-minus" aria-label="한 단 빼기">-1</button>
+          <div class="viewer-counter-value">
+            <span class="viewer-counter-num" id="viewer-counter-num">${Icons.stitchNumber(viewerCounter.value, 0.3)}</span>
+            <span class="viewer-counter-name">${Utils.escapeHtml(project.name)} · ${Utils.escapeHtml(viewerCounter.name)}</span>
+          </div>
+          <button type="button" class="btn primary viewer-plus" data-action="viewer-plus" aria-label="한 단 추가">+1</button>
+        </div>` : ''}
+      ${!project ? `<p class="card-meta" style="text-align:center;margin-top:8px">작품에 연결하면 하이라이트 위치가 저장되고 단수 카운터를 같이 쓸 수 있어요.</p>` : ''}
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    // 도안을 보면서 단수 세기: 화면 전체를 다시 그리면 도안을 다시 불러오므로 숫자만 갱신
+    if (viewerCounter) {
+      const numEl = root.querySelector('#viewer-counter-num');
+      const refreshCount = () => {
+        const fresh = Storage.getCountersByProject(project.id).find((c) => c.id === viewerCounter.id);
+        if (fresh) numEl.innerHTML = Icons.stitchNumber(fresh.value, 0.3);
+        return fresh;
+      };
+      const bump = (delta) => {
+        const fresh = refreshCount();
+        if (!fresh) return;
+        if (delta < 0 && fresh.value <= 0) return;
+        changeCounter(fresh, delta, project.id);
+        if (delta > 0) handleCounterTapSession(project.id);
+        refreshCount();
+        moveBarByRows(delta);
+        // 주기 자동 리셋은 900ms 뒤에 일어나서 한 번 더 갱신
+        if (fresh.autoReset) setTimeout(refreshCount, 950);
+      };
+      root.querySelector('[data-action="viewer-plus"]').addEventListener('click', () => {
+        if (!canTap(viewerCounter.id)) return;
+        bump(1);
+      });
+      root.querySelector('[data-action="viewer-minus"]').addEventListener('click', () => bump(-1));
+    }
 
     root.querySelector('[data-action="delete-pattern"]').addEventListener('click', async () => {
       const linked = Storage.getProjectsLinkedToPattern(patternId);
@@ -1286,6 +1428,23 @@ const App = (() => {
     const viewport = root.querySelector('#pattern-viewport');
     const content = root.querySelector('#pattern-content');
     const bar = root.querySelector('#highlight-bar');
+
+    function applyHighlightColor() {
+      const c = HIGHLIGHT_COLORS.find((h) => h.id === highlightColorId) || HIGHLIGHT_COLORS[0];
+      bar.style.setProperty('--hl-fill', c.fill);
+      bar.style.setProperty('--hl-line', c.line);
+      root.querySelectorAll('[data-highlight-color]').forEach((b) => {
+        b.setAttribute('aria-checked', b.dataset.highlightColor === c.id ? 'true' : 'false');
+      });
+    }
+    root.querySelectorAll('[data-highlight-color]').forEach((b) => {
+      b.addEventListener('click', () => {
+        highlightColorId = b.dataset.highlightColor;
+        Storage.saveSettings({ highlightColor: highlightColorId });
+        applyHighlightColor();
+      });
+    });
+    applyHighlightColor();
 
     function persist() {
       if (!project) return;
@@ -1442,6 +1601,20 @@ const App = (() => {
       persist();
     });
 
+    // 뜨개 차트는 아래에서 위로 읽음: 단수 +1 → 줄이 한 칸(=줄 두께) 위로, -1 → 아래로
+    function moveBarByRows(rows) {
+      if (!baseHeight) return;
+      const zoomedHeight = baseHeight * displayScale();
+      y = Math.max(0, Math.min(1, y - (rows * thickness) / zoomedHeight));
+      layoutBar();
+      persist();
+      // 줄이 화면 밖으로 나가면 따라가기
+      const barTop = parseFloat(bar.style.top) || 0;
+      if (barTop < viewport.scrollTop || barTop + thickness > viewport.scrollTop + viewport.clientHeight) {
+        scrollToBar();
+      }
+    }
+
     const STEP = 0.02;
     root.querySelector('[data-action="move-up"]').addEventListener('click', () => {
       y = Math.max(0, y - STEP);
@@ -1558,16 +1731,12 @@ const App = (() => {
           if (!p) return;
           if (Storage.isPatternSaved(p.id)) {
             Storage.unfavoritePattern(p.id);
-            btn.textContent = '찜하기';
-            btn.classList.remove('danger');
-            btn.classList.add('primary');
+            setHeart(btn, false);
             showBanner('찜을 해제했어요.');
           } else {
-            Storage.saveFavoritePattern({ ravelryPatternId: p.id, name: p.name, photoUrl: p.thumbnail, url: p.url });
-            btn.textContent = '찜 해제';
-            btn.classList.remove('primary');
-            btn.classList.add('danger');
-            showBanner('찜한 도안에 저장했어요.');
+            Storage.saveFavoritePattern({ ravelryPatternId: p.id, name: p.name, photoUrl: p.thumbnail, url: p.url, needleSize: p.needleSize });
+            setHeart(btn, true);
+            showBanner('Favorites에 저장했어요.');
           }
         });
       });
@@ -1624,14 +1793,16 @@ const App = (() => {
       : '필요 실 양 정보 없음';
     return `
       <div class="card">
-        <div class="card-thumb">${p.thumbnail ? `<img src="${p.thumbnail}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('pattern')}</div>`}</div>
+        <div class="card-thumb">${p.thumbnail ? `<img src="${p.thumbnail}" alt="">` : `<div class="thumb-stitch is-pattern">${Icons.stitch('pattern', 0.4)}</div>`}</div>
         <div class="card-body">
-          <div class="card-title-row"><h3>${Utils.escapeHtml(p.name)}</h3></div>
+          <div class="card-title-row">
+            <h3>${Utils.escapeHtml(p.name)}</h3>
+            ${heartButton(saved, `data-favorite="${p.id}"`)}
+          </div>
           <p class="card-sub">${Utils.escapeHtml(p.designer)} · ${p.free ? '무료' : '유료'}</p>
-          <p class="card-meta">${yardageText}</p>
+          <p class="card-meta">${[yardageText, p.needleSize && `바늘 ${Utils.escapeHtml(p.needleSize)}`].filter(Boolean).join(' · ')}</p>
           <div class="counter-controls">
             <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry</a>
-            <button type="button" class="btn ${saved ? 'danger' : 'primary'} sm" data-favorite="${p.id}">${saved ? '찜 해제' : '찜하기'}</button>
           </div>
         </div>
       </div>`;
@@ -1824,9 +1995,9 @@ const App = (() => {
       </header>
 
       <div class="status-row">
-        ${statusButton(project, 'active', '진행 중')}
-        ${statusButton(project, 'onhold', '보류')}
-        ${statusButton(project, 'completed', '완성')}
+        ${statusButton(project, 'active', 'WIP')}
+        ${statusButton(project, 'onhold', 'UFO')}
+        ${statusButton(project, 'completed', 'FO')}
       </div>
       ${project.status === 'completed' ? `
         <div class="field inline">
@@ -2031,7 +2202,11 @@ const App = (() => {
         });
         if (res.id !== 'ok') return;
         Storage.linkPatternToProject(id, res.values.patternId);
-        showBanner('도안을 연결했어요.');
+        // 작품 바늘 호수가 비어 있으면 도안의 바늘 굵기로 채움 (이미 적은 값은 그대로)
+        const linked = Storage.getPattern(res.values.patternId);
+        const fillNeedle = linked && linked.needleSize && !String(project.needleSize || '').trim();
+        if (fillNeedle) Storage.updateProject(id, { needleSize: linked.needleSize });
+        showBanner(fillNeedle ? `도안을 연결하고 바늘 호수를 ${linked.needleSize}로 채웠어요.` : '도안을 연결했어요.');
         render();
       });
     }
@@ -2054,14 +2229,14 @@ const App = (() => {
   }
 
   function statusButton(project, status, label) {
-    return `<button class="chip ${project.status === status ? 'active' : ''}" data-status="${status}">${label}</button>`;
+    return `<button class="chip display-chip ${project.status === status ? 'active' : ''}" data-status="${status}">${label}</button>`;
   }
 
   async function onStatusChange(project, status) {
     if (status === project.status) return;
     if (status === 'completed') {
       Storage.updateProject(project.id, { status, completedDate: Utils.todayStr() });
-      showBanner('작품을 완성 처리했어요. 아카이브에서 볼 수 있어요.');
+      showBanner('FO로 옮겼어요. Archive에서 볼 수 있어요.');
       go('#/archive');
       return;
     }

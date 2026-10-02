@@ -187,8 +187,14 @@ const Storage = (() => {
   }
 
   // ---- Yarns ----
+  // 예전 한국어 굵기 값 → 영어 (기존 데이터·예전 백업을 읽을 때 한 번 바꿔서 저장)
+  const LEGACY_WEIGHTS = { 레이스: 'Lace', 합연사: 'Fingering', 중세: 'DK', 합태: 'Worsted', 극태: 'Bulky', 특극태: 'Super Bulky' };
   function getYarns() {
-    return read(KEYS.yarns, []);
+    const list = read(KEYS.yarns, []);
+    if (!list.some((y) => LEGACY_WEIGHTS[y.weight])) return list;
+    const migrated = list.map((y) => (LEGACY_WEIGHTS[y.weight] ? { ...y, weight: LEGACY_WEIGHTS[y.weight] } : y));
+    write(KEYS.yarns, migrated);
+    return migrated;
   }
   function saveYarns(list) {
     return write(KEYS.yarns, list);
@@ -209,6 +215,7 @@ const Storage = (() => {
       weightPerBall: data.weightPerBall != null && data.weightPerBall !== '' ? Number(data.weightPerBall) : null,
       photo: data.photo || null,
       ravelryYarnId: data.ravelryYarnId || null,
+      needleSize: data.needleSize || '',
       createdAt: new Date().toISOString(),
     };
     yarns.push(yarn);
@@ -325,6 +332,7 @@ const Storage = (() => {
       fileType: data.fileType,
       fileSize: data.fileSize || 0,
       pageCount: data.pageCount || 1,
+      needleSize: data.needleSize || '',
       createdAt: new Date().toISOString(),
     };
     patterns.push(pattern);
@@ -378,6 +386,7 @@ const Storage = (() => {
       name: data.name,
       photoUrl: data.photoUrl || null,
       url: data.url,
+      needleSize: data.needleSize || '',
       savedAt: new Date().toISOString(),
     };
     list.push(rec);

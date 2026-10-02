@@ -188,9 +188,6 @@ body[data-view="pattern-viewer"] #app {
 }
 .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .card-thumb.square { width: 100%; height: auto; aspect-ratio: 1/1; border: none; border-bottom: var(--outline); border-radius: 0; }
-.icon { display: block; width: 100%; height: 100%; }
-.thumb-placeholder { width: 32px; height: 32px; color: var(--text); }
-.card-thumb.square .thumb-placeholder { width: 56px; height: 56px; }
 .card-body { flex: 1; min-width: 0; }
 .card-title-row { display: flex; align-items: center; gap: var(--s-2); }
 .card-title-row h3 { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-body); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -231,6 +228,9 @@ body[data-view="pattern-viewer"] #app {
   border: var(--border-w) dashed rgba(255,252,243,.9); pointer-events: none;
 }
 .thumb-stitch { width: 44px; color: var(--accent); }
+.thumb-stitch.is-pattern { width: 36px; }
+.thumb-stitch.is-yarn { width: 40px; }
+.thumb-stitch.is-archive { width: 55%; }
 .row-count { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding-right: var(--s-1); color: var(--accent); }
 .row-count-num .stitch-art { height: 32px; width: auto; }
 .row-count-unit { font-size: var(--fs-label); font-weight: 600; color: var(--text-2); }
@@ -319,6 +319,8 @@ body[data-view="pattern-viewer"] #app {
   background: var(--surface); color: var(--text-2); font-size: 13px; font-weight: 600; font-family: var(--font);
 }
 .chip.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+/* 영어 칩(WIP / UFO / FO, Library / Favorites): 문막 달반체 */
+.chip.display-chip { font-family: var(--font-display); font-weight: 400; font-size: 17px; letter-spacing: .04em; }
 
 .is-empty { opacity: .55; }
 
@@ -438,7 +440,7 @@ body[data-view="pattern-viewer"] #app {
 .tabbar a .tab-icon { display: flex; align-items: center; justify-content: center; }
 .tabbar a { font-family: var(--font-display); font-size: 13px; }
 .tabbar a.active { color: var(--text); }
-.tabbar a .tab-icon .icon { width: var(--tab-icon); height: var(--tab-icon); }
+.tabbar a .tab-icon .icon { display: block; width: var(--tab-icon); height: var(--tab-icon); }
 
 .banner {
   position: fixed; top: 0; left: 0; right: 0; margin: 0 auto;
@@ -474,6 +476,7 @@ body[data-view="pattern-viewer"] #app {
 }
 
 .pattern-toolbar { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); flex-wrap: wrap; }
+.pattern-viewport + .pattern-toolbar { margin-top: var(--s-2); }
 .pattern-toolbar-group { display: flex; align-items: center; gap: var(--s-2); font-size: 13px; font-variant-numeric: tabular-nums; }
 .pattern-toolbar-group input[type="range"] { width: 100px; }
 .pattern-toolbar .icon-btn { min-width: 44px; min-height: 44px; font-size: 18px; }
@@ -495,6 +498,89 @@ body[data-view="pattern-viewer"] #app {
 .pattern-content { position: relative; cursor: crosshair; }
 .pattern-content img, .pattern-content canvas { display: block; width: 100%; height: 100%; max-width: none; }
 .highlight-bar {
-  position: absolute; left: 0; right: 0; background: var(--highlight-bar);
-  border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); pointer-events: none;
+  position: absolute; left: 0; right: 0; background: var(--hl-fill, var(--highlight-bar));
+  border-top: 2px solid var(--hl-line, var(--accent)); border-bottom: 2px solid var(--hl-line, var(--accent)); pointer-events: none;
 }
+.highlight-swatches { gap: var(--s-1); }
+.swatch {
+  width: 28px; height: 28px; padding: 0; border-radius: var(--r-full); cursor: pointer;
+  background: var(--swatch); border: 3px solid var(--surface); box-shadow: 0 0 0 var(--border-w) var(--border);
+}
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--text); }
+
+/* 도안 뷰어 안의 단수 카운터 */
+.viewer-counter {
+  flex-shrink: 0; display: flex; align-items: center; gap: var(--s-2);
+  margin-top: var(--s-1); padding: var(--s-1);
+  background: var(--surface); border: var(--outline); border-radius: var(--r-l); box-shadow: var(--shadow);
+  transition: background 0.3s;
+}
+.viewer-counter.flash { background: var(--accent-soft); }
+.viewer-counter .btn { flex-shrink: 0; height: 56px; min-width: 64px; font-size: 18px; }
+.viewer-counter .viewer-plus { min-width: 96px; font-size: 22px; }
+.viewer-counter-value { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--accent); }
+.viewer-counter-num .stitch-art { height: 30px; width: auto; }
+.viewer-counter-name {
+  max-width: 100%; font-size: var(--fs-label); font-weight: 600; color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 도안 파일 선택 영역 */
+.file-drop {
+  display: block; cursor: pointer; border: var(--lace); border-radius: var(--r-l);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 12px 12px;
+  transition: border-color .15s, background-color .15s;
+}
+.file-drop.is-dragover { border-color: var(--accent); background-color: var(--accent-soft); }
+.file-drop.has-file { border: var(--outline); background-image: none; box-shadow: var(--shadow); }
+.file-drop-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-1);
+  padding: var(--s-4) var(--s-3); text-align: center; color: var(--text);
+}
+.file-drop-icon { width: 52px; margin-bottom: var(--s-1); color: var(--accent); }
+.file-drop-empty strong { font-size: var(--fs-body); }
+.file-drop-hint { font-size: var(--fs-label); color: var(--text-2); }
+.file-drop-picked { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2); }
+.file-drop-thumb {
+  flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-m); overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  background: var(--surface-2); color: var(--text);
+}
+.file-drop-thumb .stitch-art { width: 32px; color: var(--accent); }
+.file-drop-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.file-drop-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.file-drop-name { font-size: var(--fs-sub); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-drop-meta { font-size: var(--fs-label); color: var(--text-2); }
+.file-drop-change { flex-shrink: 0; padding: var(--s-1) var(--s-2); font-size: 13px; font-weight: 600; color: var(--label); }
+.file-drop [hidden] { display: none; }
+
+/* 찜 하트 버튼 */
+.heart-btn {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin: -8px -6px -8px 0; padding: 0;
+  background: none; border: none; border-radius: var(--r-full); cursor: pointer;
+  color: var(--text-3); transition: transform .12s, color .15s;
+}
+.heart-btn .icon { display: block; width: 24px; height: 24px; }
+.heart-btn.is-saved { color: var(--danger); }
+.heart-btn:active { transform: scale(.85); }
+.heart-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+a.btn { text-decoration: none; }
+.card-body .counter-controls .btn { flex: 0 0 auto; }
+
+/* Tools 메뉴 */
+.tools-menu { display: flex; flex-direction: column; gap: var(--s-2); }
+.tools-menu-item {
+  display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3);
+  background: var(--surface); border: var(--outline); border-radius: var(--r-l); box-shadow: var(--shadow);
+  color: var(--text); text-decoration: none; transition: transform .08s, box-shadow .08s;
+}
+.tools-menu-item:active { transform: translate(2px, 2px); box-shadow: none; }
+.tools-menu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tools-menu-title { font-family: var(--font-display); font-size: 20px; line-height: 1.3; }
+.tools-menu-sub { font-size: var(--fs-label); color: var(--text-2); }
+.tools-menu-arrow { flex-shrink: 0; color: var(--label); font-weight: 700; }

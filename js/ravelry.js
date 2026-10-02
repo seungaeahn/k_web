@@ -2,19 +2,19 @@ const Ravelry = (() => {
   const BASE = 'https://api.ravelry.com';
 
   const WEIGHT_MAP = {
-    lace: '레이스',
-    cobweb: '레이스',
-    thread: '레이스',
-    'light fingering': '합연사',
-    fingering: '합연사',
-    sock: '합연사',
-    sport: '중세',
-    dk: '중세',
-    worsted: '합태',
-    aran: '합태',
-    bulky: '극태',
-    'super bulky': '특극태',
-    jumbo: '특극태',
+    lace: 'Lace',
+    cobweb: 'Lace',
+    thread: 'Lace',
+    'light fingering': 'Fingering',
+    fingering: 'Fingering',
+    sock: 'Fingering',
+    sport: 'Sport',
+    dk: 'DK',
+    worsted: 'Worsted',
+    aran: 'Aran',
+    bulky: 'Bulky',
+    'super bulky': 'Super Bulky',
+    jumbo: 'Super Bulky',
   };
 
   function mapWeight(name) {
@@ -23,12 +23,14 @@ const Ravelry = (() => {
   }
 
   const WEIGHT_SEARCH_TERM = {
-    레이스: 'lace',
-    합연사: 'fingering',
-    중세: 'dk',
-    합태: 'worsted',
-    극태: 'bulky',
-    특극태: 'super bulky',
+    Lace: 'lace',
+    Fingering: 'fingering',
+    Sport: 'sport',
+    DK: 'dk',
+    Worsted: 'worsted',
+    Aran: 'aran',
+    Bulky: 'bulky',
+    'Super Bulky': 'super bulky',
   };
 
   const PATTERN_TYPES = [
@@ -83,6 +85,19 @@ const Ravelry = (() => {
     return true;
   }
 
+  // 바늘 굵기: Ravelry NeedleSize 객체들의 mm 값 → "4mm" / "3.5–4.5mm"
+  function formatNeedles(sizes) {
+    const mm = (sizes || [])
+      .map((n) => (n && n.metric != null ? Number(n.metric) : NaN))
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .sort((a, b) => a - b);
+    if (!mm.length) return '';
+    const fmt = (v) => String(+v.toFixed(2));
+    const min = mm[0];
+    const max = mm[mm.length - 1];
+    return min === max ? `${fmt(min)}mm` : `${fmt(min)}–${fmt(max)}mm`;
+  }
+
   async function searchYarns(query) {
     const data = await request(`/yarns/search.json?query=${encodeURIComponent(query)}&page_size=15`);
     return (data.yarns || []).map((y) => ({
@@ -111,6 +126,8 @@ const Ravelry = (() => {
       material,
       lengthPerBall: yards ? Math.round(yards * 0.9144) : null,
       weightPerBall: y.grams || null,
+      // 실마다 비어 있는 경우가 많아서 없으면 빈 값
+      needleSize: formatNeedles([y.min_needle_size, y.max_needle_size].concat(y.needle_sizes || [])),
       ravelryYarnId: y.id || id,
     };
   }
@@ -157,9 +174,10 @@ const Ravelry = (() => {
           ...b,
           metersMin: yardsMin ? Math.round(yardsMin * 0.9144) : null,
           metersMax: yardsMax ? Math.round(yardsMax * 0.9144) : null,
+          needleSize: formatNeedles(yd.pattern_needle_sizes),
         };
       } catch (e) {
-        return { ...b, metersMin: null, metersMax: null };
+        return { ...b, metersMin: null, metersMax: null, needleSize: '' };
       }
     }));
 
