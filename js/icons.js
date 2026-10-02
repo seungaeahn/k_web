@@ -1,0 +1,115 @@
+// 디자인 시스템 실루엣 아이콘 (임시본 — 손그림 SVG로 교체 예정)
+// 규칙: 24칸 모눈, currentColor로 꽉 채운 면, 안쪽 디테일은 evenodd로 비워서 표현, 윤곽은 살짝 각지게
+const Icons = (() => {
+  const PATHS = {
+    // 작품: 스웨터 + 밑단 고무단
+    project: [
+      'M8 3 L4.5 4.2 L1 9.5 L4 12.2 L6 10.2 V21 H18 V10.2 L20 12.2 L23 9.5 L19.5 4.2 L16 3 C15 5.2 9 5.2 8 3 Z M7.5 17.5 H16.5 V18.7 H7.5 Z M7.5 15.2 H16.5 V16.2 H7.5 Z',
+    ],
+    // 실: 실타래 + 감긴 결 + 꼬리
+    yarn: [
+      'M3 11 A8.5 8.5 0 1 0 20 11 A8.5 8.5 0 1 0 3 11 Z M5.7 7.6 L14.1 4 L15.1 5.3 L6.6 9 Z M4.4 12.1 L16.9 6.4 L17.8 7.9 L5.3 13.6 Z M6.9 16.6 L18.4 11.2 L18.7 12.9 L8.6 17.7 Z',
+      'M11 19.2 C13 22 17 20.4 23 22 L22.7 23.4 C17 21.9 13.4 23.6 10.6 20.6 Z',
+    ],
+    // 도안: 접힌 귀퉁이가 있는 도안지 + 모눈 칸
+    pattern: [
+      'M4 2 H14 L20 8 V22 H4 Z M13 3.6 V9 H18.4 V8 H14 V3.6 Z M7 11.5 H9.2 V13.7 H7 Z M10.6 11.5 H12.8 V13.7 H10.6 Z M14.2 11.5 H16.4 V13.7 H14.2 Z M7 15.1 H9.2 V17.3 H7 Z M10.6 15.1 H12.8 V17.3 H10.6 Z M14.2 15.1 H16.4 V17.3 H14.2 Z M7 18.7 H9.2 V20 H7 Z M10.6 18.7 H12.8 V20 H10.6 Z',
+    ],
+    // 도구: 가위
+    tools: [
+      'M8.3 14.6 L17.2 2 L18.6 3 L10.3 16 Z',
+      'M15.7 14.6 L6.8 2 L5.4 3 L13.7 16 Z',
+      'M2.5 17.5 A3.7 3.7 0 1 0 9.9 17.5 A3.7 3.7 0 1 0 2.5 17.5 Z M4.4 17.5 A1.8 1.8 0 1 0 8 17.5 A1.8 1.8 0 1 0 4.4 17.5 Z',
+      'M14.1 17.5 A3.7 3.7 0 1 0 21.5 17.5 A3.7 3.7 0 1 0 14.1 17.5 Z M16 17.5 A1.8 1.8 0 1 0 19.6 17.5 A1.8 1.8 0 1 0 16 17.5 Z',
+    ],
+    // 아카이브: 뚜껑 덮은 보관 상자
+    archive: [
+      'M2 3.5 H22 V8.5 H2 Z',
+      'M3.5 10 H20.5 V21 H3.5 Z M9 12.6 H15 V14.6 H9 Z',
+    ],
+    // 이미지 도안: 액자 + 산 + 해
+    image: [
+      'M2 4 H22 V20 H2 Z M4 6 V18 H20 V6 Z',
+      'M5 17 L10 10.5 L13 14.3 L15.2 12 L19 17 Z',
+      'M15 8.8 A1.6 1.6 0 1 0 18.2 8.8 A1.6 1.6 0 1 0 15 8.8 Z',
+    ],
+  };
+
+  function svg(name, size) {
+    const paths = PATHS[name] || PATHS.pattern;
+    const dim = size ? ` width="${size}" height="${size}"` : '';
+    return `<svg class="icon" viewBox="0 0 24 24"${dim} fill="currentColor" aria-hidden="true">${
+      paths.map((d) => `<path fill-rule="evenodd" d="${d}"/>`).join('')
+    }</svg>`;
+  }
+
+  // 십자수 그림: '#' 칸마다 X 한 땀 (빈 화면 등 큰 그림용, 슬레이트 블루)
+  const STITCHES = {
+    sweater: [
+      '....####...####....',
+      '..######...######..',
+      '.#################.',
+      '###################',
+      '###.###########.###',
+      '###.####.#.####.###',
+      '###.###.....###.###',
+      '###.####...####.###',
+      '###.#####.#####.###',
+      '....###########....',
+      '....###########....',
+      '....#.#.#.#.#.#....',
+      '....###########....',
+    ],
+  };
+
+  // 십자수 숫자: 3×5칸
+  const DIGITS = {
+    0: ['###', '#.#', '#.#', '#.#', '###'],
+    1: ['.#.', '##.', '.#.', '.#.', '###'],
+    2: ['###', '..#', '###', '#..', '###'],
+    3: ['###', '..#', '.##', '..#', '###'],
+    4: ['#.#', '#.#', '###', '..#', '..#'],
+    5: ['###', '#..', '###', '..#', '###'],
+    6: ['###', '#..', '###', '#.#', '###'],
+    7: ['###', '..#', '..#', '.#.', '.#.'],
+    8: ['###', '#.#', '###', '#.#', '###'],
+    9: ['###', '#.#', '###', '..#', '###'],
+  };
+
+  function stitch(name, weight) {
+    return stitchRows(STITCHES[name] || [], weight);
+  }
+
+  function stitchNumber(n, weight) {
+    const digits = String(Math.max(0, Math.floor(Number(n) || 0))).split('');
+    const rows = [0, 1, 2, 3, 4].map((y) => digits.map((d) => DIGITS[d][y]).join('.'));
+    return stitchRows(rows, weight, `${n}`);
+  }
+
+  // weight: 땀 굵기(칸 대비 비율). 작게 그릴수록 크게 줘야 또렷함
+  function stitchRows(rows, weight = 0.2, label) {
+    const cell = 8;
+    const w = Math.max(...rows.map((r) => r.length)) * cell;
+    const h = rows.length * cell;
+    const p = cell * 0.2;
+    let d = '';
+    rows.forEach((row, y) => {
+      [...row].forEach((ch, x) => {
+        if (ch !== '#') return;
+        const x0 = x * cell + p, y0 = y * cell + p, x1 = (x + 1) * cell - p, y1 = (y + 1) * cell - p;
+        d += `M${x0} ${y0}L${x1} ${y1}M${x1} ${y0}L${x0} ${y1}`;
+      });
+    });
+    return `<svg class="stitch-art" viewBox="0 0 ${w} ${h}" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}><path d="${d}" fill="none" stroke="currentColor" stroke-width="${cell * weight}" stroke-linecap="round"/></svg>`;
+  }
+
+  // 정적 마크업(탭바 등)의 [data-icon] 자리를 채움
+  function hydrate(scope) {
+    (scope || document).querySelectorAll('[data-icon]').forEach((el) => {
+      el.innerHTML = svg(el.dataset.icon);
+    });
+  }
+
+  hydrate();
+  return { svg, stitch, stitchNumber, hydrate };
+})();

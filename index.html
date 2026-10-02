@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>뜨개 다이어리</title>
 <meta name="description" content="뜨개 작품, 단수, 시간을 기록하는 개인용 앱">
-<meta name="theme-color" content="#F4EDE1">
+<meta name="theme-color" content="#F6E2A6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="뜨개 다이어리">
@@ -19,11 +19,11 @@
 <div id="banner" class="banner"></div>
 <div id="app"></div>
 <nav class="tabbar">
-  <a href="#/" data-tab="projects"><span class="tab-icon">🧶</span>작품</a>
-  <a href="#/yarn" data-tab="yarn"><span class="tab-icon">🧵</span>실</a>
-  <a href="#/pattern" data-tab="pattern"><span class="tab-icon">📄</span>도안</a>
-  <a href="#/tools" data-tab="tools"><span class="tab-icon">🧮</span>도구</a>
-  <a href="#/archive" data-tab="archive"><span class="tab-icon">🏆</span>아카이브</a>
+  <a href="#/" data-tab="projects"><span class="tab-icon" data-icon="project"></span>Projects</a>
+  <a href="#/yarn" data-tab="yarn"><span class="tab-icon" data-icon="yarn"></span>Yarn</a>
+  <a href="#/pattern" data-tab="pattern"><span class="tab-icon" data-icon="pattern"></span>Patterns</a>
+  <a href="#/tools" data-tab="tools"><span class="tab-icon" data-icon="tools"></span>Tools</a>
+  <a href="#/archive" data-tab="archive"><span class="tab-icon" data-icon="archive"></span>Archive</a>
 </nav>
 <script src="vendor/pdfjs/pdf.min.js"></script>
 <script>
@@ -31,6 +31,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
   }
 </script>
+<script src="js/icons.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/filestore.js"></script>
 <script src="js/storage.js"></script>

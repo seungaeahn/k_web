@@ -1,9 +1,11 @@
-const CACHE_NAME = 'kw-cache-v16';
+const CACHE_NAME = 'kw-cache-v44';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/style.css',
+  './css/MUNMAK_DALBANCHE.ttf',
+  './js/icons.js',
   './js/utils.js',
   './js/filestore.js',
   './js/storage.js',

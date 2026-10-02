@@ -6,6 +6,7 @@ const App = (() => {
   let tapGuard = {};
   let flashTimers = {};
   let currentRoute = { name: '', params: {} };
+  let viewCleanup = null;
 
   // ---------- Banner ----------
   function showBanner(message, tone = 'info', duration = 3000) {
@@ -18,6 +19,8 @@ const App = (() => {
   }
 
   // ---------- Wake Lock ----------
+  // Screens where the user is knitting along and the display shouldn't dim.
+  const KEEP_AWAKE_ROUTES = ['project-detail', 'pattern-viewer'];
   async function acquireWakeLock() {
     try {
       if ('wakeLock' in navigator) {
@@ -32,7 +35,7 @@ const App = (() => {
     }
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && currentRoute.name === 'project-detail') {
+    if (document.visibilityState === 'visible' && KEEP_AWAKE_ROUTES.includes(currentRoute.name)) {
       acquireWakeLock();
     }
   });
@@ -206,6 +209,7 @@ const App = (() => {
     }
     if (parts[0] === 'pattern') {
       if (parts[1] === 'new') return { name: 'pattern-form', params: {} };
+      if (parts[1] === 'saved') return { name: 'pattern-list', params: { tab: 'saved' } };
       if (parts[1] === 'recommend' && parts[2]) return { name: 'pattern-recommend', params: { yarnId: parts[2] } };
       if (parts[1] && parts[2] === 'for' && parts[3]) return { name: 'pattern-viewer', params: { id: parts[1], projectId: parts[3] } };
       if (parts[1]) return { name: 'pattern-viewer', params: { id: parts[1] } };
@@ -234,8 +238,13 @@ const App = (() => {
   function render() {
     const route = parseHash();
     currentRoute = route;
-    if (route.name !== 'project-detail') releaseWakeLock();
-    else acquireWakeLock();
+    if (viewCleanup) {
+      viewCleanup();
+      viewCleanup = null;
+    }
+    document.body.dataset.view = route.name;
+    if (KEEP_AWAKE_ROUTES.includes(route.name)) acquireWakeLock();
+    else releaseWakeLock();
 
     switch (route.name) {
       case 'list': return renderList();
@@ -250,7 +259,7 @@ const App = (() => {
       case 'tools-abbr': return renderAbbreviations();
       case 'tools-backup': return renderBackup();
       case 'tools-ravelry': return renderRavelrySettings();
-      case 'pattern-list': return renderPatternList();
+      case 'pattern-list': return renderPatternList(route.params.tab);
       case 'pattern-form': return renderPatternForm();
       case 'pattern-viewer': return renderPatternViewer(route.params.id, route.params.projectId);
       case 'pattern-recommend': return renderPatternRecommend(route.params.yarnId);
@@ -278,13 +287,21 @@ const App = (() => {
 
     root.innerHTML = `
       <header class="page-header">
-        <h1>작품</h1>
-        <button class="btn primary sm" data-action="new-project">+ 새 작품</button>
+        <h1>Projects</h1>
+        <button class="btn primary sm" data-action="new-project">+ New Project</button>
       </header>
-      <div class="list">
-        ${projects.length === 0 ? emptyState('아직 작품이 없어요', '새 작품을 추가해서 뜨개를 시작해보세요.') : projects.map(projectCard).join('')}
-      </div>
-      ${completedCount > 0 ? `<div class="list-footer-link"><a href="#/archive">완성한 작품 ${completedCount}개 보기 →</a></div>` : ''}
+      ${projects.length === 0
+        ? emptyState('아직 작품이 없어요', '새 작품을 추가해서 뜨개를 시작해보세요.', 'sweater')
+        : [['active', '진행 중'], ['onhold', '보류']].map(([status, label]) => {
+          const group = projects.filter((p) => p.status === status);
+          if (!group.length) return '';
+          return `
+            <section class="project-group">
+              <h2 class="section-head">${label} ${group.length}</h2>
+              <div class="list">${group.map(projectCard).join('')}</div>
+            </section>`;
+        }).join('')}
+      ${completedCount > 0 ? `<div class="list-footer-pill"><a class="pill-link" href="#/archive">완성한 작품 ${completedCount}개</a></div>` : ''}
     `;
 
     root.querySelector('[data-action="new-project"]').addEventListener('click', () => go('#/project/new'));
@@ -293,29 +310,38 @@ const App = (() => {
     });
   }
 
-  function emptyState(title, desc) {
-    return `<div class="empty-state"><p class="empty-title">${title}</p><p class="empty-desc">${desc}</p></div>`;
+  function emptyState(title, desc, art) {
+    return `<div class="empty-state">${art ? `<div class="empty-art">${Icons.stitch(art)}</div>` : ''}<p class="empty-title">${title}</p><p class="empty-desc">${desc}</p></div>`;
   }
 
-  function statusLabel(status) {
-    return status === 'active' ? '진행 중' : status === 'onhold' ? '보류' : '완성';
+  // 마지막 작업일: 달력 날짜 기준 "오늘 떴어요" / "N일 전"
+  function lastWorkedLabel(iso) {
+    if (!iso) return '';
+    const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const days = Math.round((startOf(new Date()) - startOf(new Date(iso))) / 86400000);
+    return days <= 0 ? '오늘 떴어요' : `${days}일 전`;
   }
 
   function projectCard(p) {
     const cover = p.photos && p.photos[p.mainPhotoIndex || 0];
     const counters = Storage.getCountersByProject(p.id);
     const main = counters.find((c) => c.isDefault) || counters[0];
+    const totalMs = projectTotalMs(p.id);
+    // 만들 때 lastWorkedAt = createdAt 이라, 단수 변경·시간 기록이 없으면 아직 안 뜬 작품
+    const hasWorked = p.lastWorkedAt !== p.createdAt || Storage.getSessionsByProject(p.id).length > 0;
+    const meta = [hasWorked && lastWorkedLabel(p.lastWorkedAt), totalMs > 0 && `총 ${Utils.formatDuration(totalMs)}`].filter(Boolean).join(' · ');
     return `
-      <div class="card project-card" data-project-id="${p.id}">
-        <div class="card-thumb">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-placeholder">🧶</div>`}</div>
+      <div class="card project-card ${p.status === 'onhold' ? 'is-onhold' : ''}" data-project-id="${p.id}">
+        <div class="card-thumb ${cover ? 'has-photo' : ''}">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-stitch">${Icons.stitch('sweater', 0.38)}</div>`}</div>
         <div class="card-body">
-          <div class="card-title-row">
-            <span class="status-badge status-${p.status}">${statusLabel(p.status)}</span>
-            <h3>${Utils.escapeHtml(p.name)}</h3>
-          </div>
-          <p class="card-sub">${main ? `${Utils.escapeHtml(main.name)} ${main.value}${main.name === '단수' ? '단' : ''}` : ''}</p>
-          <p class="card-meta">오늘 ${Utils.formatDuration(projectTodayMs(p.id))} · 총 ${Utils.formatDuration(projectTotalMs(p.id))}</p>
+          <h3 class="project-card-title">${Utils.escapeHtml(p.name)}</h3>
+          ${meta ? `<p class="card-meta">${meta}</p>` : ''}
         </div>
+        ${main ? `
+          <div class="row-count">
+            <div class="row-count-num">${Icons.stitchNumber(main.value, 0.3)}</div>
+            <span class="row-count-unit">단</span>
+          </div>` : ''}
       </div>`;
   }
 
@@ -328,7 +354,7 @@ const App = (() => {
     const totalMs = projects.reduce((sum, p) => sum + projectTotalMs(p.id), 0);
 
     root.innerHTML = `
-      <header class="page-header"><h1>아카이브</h1></header>
+      <header class="page-header"><h1>Archive</h1></header>
       <div class="archive-summary">
         <div><strong>${projects.length}</strong><span>완성작</span></div>
         <div><strong>${Utils.formatDuration(totalMs)}</strong><span>총 뜨개 시간</span></div>
@@ -346,7 +372,7 @@ const App = (() => {
     const cover = p.photos && p.photos[p.mainPhotoIndex || 0];
     return `
       <div class="card archive-card" data-project-id="${p.id}">
-        <div class="card-thumb square">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-placeholder">🧶</div>`}</div>
+        <div class="card-thumb square">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('project')}</div>`}</div>
         <div class="card-body">
           <h3>${Utils.escapeHtml(p.name)}</h3>
           <p class="card-meta">${Utils.formatDate(p.completedDate)}</p>
@@ -366,15 +392,15 @@ const App = (() => {
 
     root.innerHTML = `
       <header class="page-header">
-        <h1>실</h1>
-        <button class="btn primary sm" data-action="new-yarn">+ 실 추가</button>
+        <h1>Yarn</h1>
+        <button class="btn primary sm" data-action="new-yarn">+ Add Yarn</button>
       </header>
       ${usedWeights.length ? `
         <div class="status-row wrap" id="yarn-weight-filter">
           <button type="button" class="chip active" data-weight="all">전체</button>
           ${usedWeights.map((w) => `<button type="button" class="chip" data-weight="${Utils.escapeHtml(w)}">${Utils.escapeHtml(w)}</button>`).join('')}
         </div>` : ''}
-      <label class="field">
+      <label class="field search-field">
         <input type="text" id="yarn-search" placeholder="이름, 색상으로 검색">
       </label>
       <div class="list" id="yarn-list-body"></div>
@@ -420,7 +446,7 @@ const App = (() => {
     const empty = !(y.amount > 0);
     return `
       <div class="card ${empty ? 'is-empty' : ''}" data-yarn-id="${y.id}">
-        <div class="card-thumb">${y.photo ? `<img src="${y.photo}" alt="">` : `<div class="thumb-placeholder">🧵</div>`}</div>
+        <div class="card-thumb">${y.photo ? `<img src="${y.photo}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('yarn')}</div>`}</div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(y.name)}</h3></div>
           <p class="card-sub">${[y.color, y.weight, y.material].filter(Boolean).map((v) => Utils.escapeHtml(v)).join(' · ') || '-'}</p>
@@ -439,20 +465,22 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
-        <h1>${editing ? '실 수정' : '새 실'}</h1>
+        ${editing ? '<h1>실 수정</h1>' : '<h1 class="display-title">New Yarn</h1>'}
       </header>
       <form id="yarn-form" class="form">
         <label class="field">
           <span>브랜드/이름 <em>*</em></span>
-          <input type="text" name="name" value="${yarn ? Utils.escapeHtml(yarn.name) : ''}" placeholder="예: 메리노 DK">
+          ${Ravelry.isConfigured() ? `
+            <div class="input-with-action">
+              <input type="text" name="name" value="${yarn ? Utils.escapeHtml(yarn.name) : ''}" placeholder="예: 메리노 DK" enterkeyhint="search">
+              <button type="button" class="btn ghost sm" data-action="ravelry-search">Ravelry 검색</button>
+            </div>
+          ` : `<input type="text" name="name" value="${yarn ? Utils.escapeHtml(yarn.name) : ''}" placeholder="예: 메리노 DK">`}
           <p class="field-error" id="name-error" hidden>이름을 입력해주세요.</p>
         </label>
-        ${Ravelry.isConfigured() ? `
-          <div class="info-block" id="ravelry-search-block">
-            <button type="button" class="btn ghost sm" data-action="ravelry-search">Ravelry에서 찾아서 정보 채우기</button>
-            <div class="list" id="ravelry-results"></div>
-          </div>
-        ` : `<p class="card-meta">Ravelry 연동을 설정하면 위 이름으로 실 정보를 자동으로 불러올 수 있어요. <a href="#/tools/ravelry">설정하러 가기 →</a></p>`}
+        ${Ravelry.isConfigured()
+          ? `<div class="list" id="ravelry-results"></div>`
+          : `<p class="card-meta">Ravelry 연동을 설정하면 위 이름으로 실 정보를 자동으로 불러올 수 있어요. <a href="#/tools/ravelry">설정하러 가기 →</a></p>`}
         <label class="field">
           <span>색상</span>
           <input type="text" name="color" value="${yarn ? Utils.escapeHtml(yarn.color) : ''}" placeholder="예: 카멜">
@@ -551,6 +579,12 @@ const App = (() => {
           });
         });
       });
+      // 이름 칸에서 엔터를 누르면 폼 저장 대신 Ravelry 검색
+      root.querySelector('[name="name"]').addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.isComposing) return;
+        e.preventDefault();
+        ravelrySearchBtn.click();
+      });
     }
 
     function refreshPhotoGrid() {
@@ -629,7 +663,7 @@ const App = (() => {
   function renderToolsHome() {
     setActiveTab('tools');
     root.innerHTML = `
-      <header class="page-header"><h1>도구</h1></header>
+      <header class="page-header"><h1>Tools</h1></header>
       <a class="link-row" href="#/tools/gauge">게이지 계산기 →</a>
       <a class="link-row" href="#/tools/abbreviations">약어 사전 →</a>
       <a class="link-row" href="#/tools/backup">백업 (내보내기/가져오기) →</a>
@@ -753,7 +787,7 @@ const App = (() => {
         <h1>약어 사전</h1>
         <button class="btn primary sm" data-action="new-abbr">+ 추가</button>
       </header>
-      <label class="field"><input type="text" id="abbr-search" placeholder="약어, 설명 검색"></label>
+      <label class="field search-field"><input type="text" id="abbr-search" placeholder="약어, 설명 검색"></label>
       <div class="list" id="abbr-list-body"></div>
       <div class="list-footer-link" id="abbr-restore" hidden><a href="#" data-action="restore-defaults">기본 약어 복원</a></div>
     `;
@@ -1004,47 +1038,63 @@ const App = (() => {
     }
   }
 
-  function renderPatternList() {
+  function renderPatternList(tab) {
+    tab = tab === 'saved' ? 'saved' : 'owned';
     setActiveTab('pattern');
     revokePatternObjectUrl();
     const patterns = Storage.getPatterns();
     const saved = Storage.getSavedPatterns();
+
     root.innerHTML = `
       <header class="page-header">
-        <h1>도안</h1>
-        <button class="btn primary sm" data-action="new-pattern">+ 도안 추가</button>
+        <h1>Patterns</h1>
+        <button class="btn primary sm" data-action="new-pattern">+ Add Pattern</button>
       </header>
-      <div class="list">
-        ${patterns.length === 0 ? emptyState('아직 등록한 도안이 없어요', '이미지나 PDF로 된 도안을 추가해보세요.') : patterns.map(patternCard).join('')}
+      <div class="status-row" id="pattern-tab-switch">
+        <button type="button" class="chip ${tab === 'owned' ? 'active' : ''}" data-tab="owned">소장 도안</button>
+        <button type="button" class="chip ${tab === 'saved' ? 'active' : ''}" data-tab="saved">찜한 도안</button>
       </div>
-      <div class="section-title-row" style="margin-top:var(--s-6)">
-        <h3>찜한 도안</h3>
-      </div>
-      <div class="list" id="saved-pattern-list">
-        ${saved.length === 0 ? `<p class="card-meta">실 보관함에서 "이 실로 뜰 도안 찾기"로 찜한 도안이 여기 모여요.</p>` : saved.map(savedPatternCard).join('')}
-      </div>
+      <div class="list" id="pattern-tab-body"></div>
     `;
+
     root.querySelector('[data-action="new-pattern"]').addEventListener('click', () => go('#/pattern/new'));
-    root.querySelectorAll('[data-pattern-id]').forEach((el) => {
-      el.addEventListener('click', () => go(`#/pattern/${el.dataset.patternId}`));
-    });
-    root.querySelectorAll('[data-unfavorite]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        Storage.unfavoritePattern(btn.dataset.unfavorite);
-        showBanner('찜을 해제했어요.');
-        renderPatternList();
+
+    const body = root.querySelector('#pattern-tab-body');
+    if (tab === 'owned') {
+      body.innerHTML = patterns.length === 0
+        ? emptyState('아직 등록한 도안이 없어요', '이미지나 PDF로 된 도안을 추가해보세요.')
+        : patterns.map(patternCard).join('');
+      body.querySelectorAll('[data-pattern-id]').forEach((el) => {
+        el.addEventListener('click', () => go(`#/pattern/${el.dataset.patternId}`));
       });
+    } else {
+      body.innerHTML = saved.length === 0
+        ? emptyState('찜한 도안이 없어요', '실 보관함에서 "이 실로 뜰 도안 찾기"로 찜해보세요.')
+        : saved.map(savedPatternCard).join('');
+      body.querySelectorAll('[data-unfavorite]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          Storage.unfavoritePattern(btn.dataset.unfavorite);
+          showBanner('찜을 해제했어요.');
+          renderPatternList('saved');
+        });
+      });
+    }
+
+    root.querySelector('#pattern-tab-switch').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-tab]');
+      if (!btn) return;
+      go(btn.dataset.tab === 'saved' ? '#/pattern/saved' : '#/pattern');
     });
   }
 
   function savedPatternCard(p) {
     return `
       <div class="card">
-        <div class="card-thumb">${p.photoUrl ? `<img src="${p.photoUrl}" alt="">` : `<div class="thumb-placeholder">📄</div>`}</div>
+        <div class="card-thumb">${p.photoUrl ? `<img src="${p.photoUrl}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('pattern')}</div>`}</div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(p.name)}</h3></div>
           <div class="counter-controls">
-            <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry에서 보기</a>
+            <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry</a>
             <button type="button" class="btn danger sm" data-unfavorite="${p.ravelryPatternId}">찜 해제</button>
           </div>
         </div>
@@ -1054,7 +1104,7 @@ const App = (() => {
   function patternCard(pt) {
     return `
       <div class="card" data-pattern-id="${pt.id}">
-        <div class="card-thumb"><div class="thumb-placeholder">${pt.fileType === 'pdf' ? '📄' : '🖼️'}</div></div>
+        <div class="card-thumb"><div class="thumb-placeholder">${Icons.svg(pt.fileType === 'pdf' ? 'pattern' : 'image')}</div></div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(pt.name)}</h3></div>
           <p class="card-sub">${pt.fileType === 'pdf' ? `PDF · ${pt.pageCount}페이지` : '이미지'}</p>
@@ -1068,7 +1118,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
-        <h1>새 도안</h1>
+        <h1 class="display-title">New Pattern</h1>
       </header>
       <form id="pattern-form" class="form">
         <label class="field">
@@ -1219,6 +1269,11 @@ const App = (() => {
       go('#/pattern');
     });
 
+    // zoom is relative to "fit to viewport width" (1 = 100% = fills the width),
+    // so the pattern opens at a readable size on phones and tablets alike and
+    // stays fitted when an iPad is rotated.
+    const MIN_ZOOM = 0.5;
+    const MAX_ZOOM = 4;
     let zoom = 1;
     let page = initial.page;
     let y = initial.y;
@@ -1228,6 +1283,7 @@ const App = (() => {
     let pdfDoc = null;
     let blobRef = null;
 
+    const viewport = root.querySelector('#pattern-viewport');
     const content = root.querySelector('#pattern-content');
     const bar = root.querySelector('#highlight-bar');
 
@@ -1236,21 +1292,50 @@ const App = (() => {
       Storage.saveProjectHighlight(project.id, { page, y, barThickness: thickness });
     }
 
+    // CSS px per source px at the current zoom.
+    function displayScale() {
+      if (!baseWidth) return 1;
+      return (viewport.clientWidth / baseWidth) * zoom;
+    }
+
     function layoutBar() {
       // content is laid out at its real zoomed pixel size (width/height set
       // directly, not via CSS transform) so the parent viewport's overflow/
       // scroll works correctly at any zoom level. Bar top/height are in that
       // same zoomed pixel space.
-      const zoomedHeight = baseHeight * zoom;
+      const zoomedHeight = baseHeight * displayScale();
       bar.style.height = `${thickness}px`;
       bar.style.top = `${Math.max(0, Math.min(zoomedHeight - thickness, y * zoomedHeight - thickness / 2))}px`;
     }
 
     function applyZoom() {
-      content.style.width = `${baseWidth * zoom}px`;
-      content.style.height = `${baseHeight * zoom}px`;
+      const scale = displayScale();
+      content.style.width = `${baseWidth * scale}px`;
+      content.style.height = `${baseHeight * scale}px`;
       root.querySelector('#zoom-label').textContent = `${Math.round(zoom * 100)}%`;
       layoutBar();
+    }
+
+    // Zoom while keeping the pattern point under (clientX, clientY) in place —
+    // the pinch midpoint, or the viewport center for the +/− buttons.
+    function zoomTo(nextZoom, clientX, clientY) {
+      if (!baseWidth) return;
+      const rect = viewport.getBoundingClientRect();
+      const ax = (clientX === undefined ? rect.left + rect.width / 2 : clientX) - rect.left - viewport.clientLeft;
+      const ay = (clientY === undefined ? rect.top + rect.height / 2 : clientY) - rect.top - viewport.clientTop;
+      const prevScale = displayScale();
+      const px = (viewport.scrollLeft + ax) / prevScale;
+      const py = (viewport.scrollTop + ay) / prevScale;
+      zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+      applyZoom();
+      const scale = displayScale();
+      viewport.scrollLeft = px * scale - ax;
+      viewport.scrollTop = py * scale - ay;
+    }
+
+    function scrollToBar() {
+      const zoomedHeight = baseHeight * displayScale();
+      viewport.scrollTop = Math.max(0, y * zoomedHeight - viewport.clientHeight / 2);
     }
 
     async function renderImagePage(blob) {
@@ -1272,7 +1357,13 @@ const App = (() => {
         pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
       }
       const pdfPage = await pdfDoc.getPage(page);
-      const pageViewport = pdfPage.getViewport({ scale: 2 });
+      // Render sharp enough for the fitted view on retina screens (iPad) with
+      // headroom for zooming in, but under iOS Safari's canvas pixel cap.
+      const unscaled = pdfPage.getViewport({ scale: 1 });
+      const dpr = window.devicePixelRatio || 1;
+      const wanted = Math.max(2, (viewport.clientWidth * dpr * 1.5) / unscaled.width);
+      const maxScale = Math.sqrt(12e6 / (unscaled.width * unscaled.height));
+      const pageViewport = pdfPage.getViewport({ scale: Math.min(wanted, maxScale) });
       const canvas = root.querySelector('#pattern-surface');
       canvas.width = pageViewport.width;
       canvas.height = pageViewport.height;
@@ -1286,13 +1377,42 @@ const App = (() => {
     }
 
     root.querySelector('[data-action="zoom-in"]').addEventListener('click', () => {
-      zoom = Math.min(3, +(zoom + 0.25).toFixed(2));
-      applyZoom();
+      zoomTo(+(zoom + 0.25).toFixed(2));
     });
     root.querySelector('[data-action="zoom-out"]').addEventListener('click', () => {
-      zoom = Math.max(0.5, +(zoom - 0.25).toFixed(2));
-      applyZoom();
+      zoomTo(+(zoom - 0.25).toFixed(2));
     });
+
+    // Two-finger pinch zooms the pattern only, not the whole page.
+    let pinch = null;
+    const touchDistance = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    viewport.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) pinch = { distance: touchDistance(e.touches), zoom };
+    }, { passive: true });
+    viewport.addEventListener('touchmove', (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      const [a, b] = [e.touches[0], e.touches[1]];
+      zoomTo(pinch.zoom * (touchDistance(e.touches) / pinch.distance), (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+    }, { passive: false });
+    viewport.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) pinch = null;
+    });
+    // Safari fires its own gesture events for pinch; stop them zooming the page.
+    viewport.addEventListener('gesturestart', (e) => e.preventDefault());
+
+    // Re-fit when the viewport changes size (iPad rotation, split view).
+    if ('ResizeObserver' in window) {
+      const resizeObserver = new ResizeObserver(() => {
+        if (!baseWidth || !viewport.clientWidth) return;
+        // Keep the same spot of the pattern on screen across the re-fit.
+        const ratio = viewport.scrollTop / (viewport.scrollHeight || 1);
+        applyZoom();
+        viewport.scrollTop = ratio * viewport.scrollHeight;
+      });
+      resizeObserver.observe(viewport);
+      viewCleanup = () => resizeObserver.disconnect();
+    }
 
     if (pattern.fileType === 'pdf') {
       root.querySelector('[data-action="prev-page"]').addEventListener('click', async () => {
@@ -1300,6 +1420,7 @@ const App = (() => {
         page -= 1;
         y = 0.5;
         await renderPdfPage(blobRef);
+        scrollToBar();
         persist();
       });
       root.querySelector('[data-action="next-page"]').addEventListener('click', async () => {
@@ -1307,6 +1428,7 @@ const App = (() => {
         page += 1;
         y = 0.5;
         await renderPdfPage(blobRef);
+        scrollToBar();
         persist();
       });
     }
@@ -1315,7 +1437,7 @@ const App = (() => {
       if (!baseHeight) return;
       const rect = content.getBoundingClientRect();
       const offsetY = e.clientY - rect.top;
-      y = Math.max(0, Math.min(1, offsetY / (baseHeight * zoom)));
+      y = Math.max(0, Math.min(1, offsetY / (baseHeight * displayScale())));
       layoutBar();
       persist();
     });
@@ -1346,6 +1468,8 @@ const App = (() => {
       blobRef = blob;
       if (pattern.fileType === 'image') await renderImagePage(blob);
       else await renderPdfPage(blob);
+      // Reopen right where the saved highlight is.
+      scrollToBar();
     });
   }
 
@@ -1397,8 +1521,8 @@ const App = (() => {
       <div class="form-actions">
         <button type="button" class="btn primary block" data-action="search">도안 찾기</button>
       </div>
-      <div class="list" id="pattern-results"></div>
-      <p class="card-meta" style="text-align:center">검색 결과는 Ravelry에서 가져와요. 이 앱은 Ravelry에서 만들거나 제휴·보증한 앱이 아니에요.</p>
+      <div class="list results-list" id="pattern-results"></div>
+      <p class="card-meta results-note">검색 결과는 Ravelry에서 가져와요. 이 앱은 Ravelry에서 만들거나 제휴·보증한 앱이 아니에요.</p>
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
@@ -1500,13 +1624,13 @@ const App = (() => {
       : '필요 실 양 정보 없음';
     return `
       <div class="card">
-        <div class="card-thumb">${p.thumbnail ? `<img src="${p.thumbnail}" alt="">` : `<div class="thumb-placeholder">📄</div>`}</div>
+        <div class="card-thumb">${p.thumbnail ? `<img src="${p.thumbnail}" alt="">` : `<div class="thumb-placeholder">${Icons.svg('pattern')}</div>`}</div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(p.name)}</h3></div>
           <p class="card-sub">${Utils.escapeHtml(p.designer)} · ${p.free ? '무료' : '유료'}</p>
           <p class="card-meta">${yardageText}</p>
           <div class="counter-controls">
-            <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry에서 보기</a>
+            <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry</a>
             <button type="button" class="btn ${saved ? 'danger' : 'primary'} sm" data-favorite="${p.id}">${saved ? '찜 해제' : '찜하기'}</button>
           </div>
         </div>
@@ -1522,7 +1646,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
-        <h1>${editing ? '작품 수정' : '새 작품'}</h1>
+        ${editing ? '<h1>작품 수정</h1>' : '<h1 class="display-title">New Project</h1>'}
       </header>
       <form id="project-form" class="form">
         <label class="field">
@@ -1691,8 +1815,6 @@ const App = (() => {
     const extraCounters = counters.filter((c) => c.id !== (mainCounter && mainCounter.id));
     const active = activeSessionFor(id);
     const manualActive = active && active.mode === 'manual';
-    const lastAction = Storage.getLastAction();
-    const canUndo = lastAction && lastAction.projectId === id;
 
     root.innerHTML = `
       <header class="page-header with-back">
@@ -1723,7 +1845,7 @@ const App = (() => {
         </button>
       </div>
 
-      ${mainCounter ? mainCounterBlock(mainCounter, canUndo) : ''}
+      ${mainCounter ? mainCounterBlock(mainCounter) : ''}
 
       <div class="extra-counters">
         <div class="section-title-row">
@@ -1750,28 +1872,44 @@ const App = (() => {
       </div>
 
       <div class="info-block">
-        <h3>연결한 실</h3>
+        <div class="section-title-row">
+          <h3>연결한 실</h3>
+          <button type="button" class="btn ghost sm" data-action="link-yarn">+ 실 연결</button>
+        </div>
         ${(project.yarns || []).length === 0 ? `<p class="card-meta">연결된 실이 없어요.</p>` : `
-          <ul class="yarn-link-list">
+          <ul class="link-list">
             ${(project.yarns || []).map((l) => {
               const liveYarn = Storage.getYarn(l.yarnId);
-              const label = liveYarn ? liveYarn.name : `${l.yarnName || '실'} (삭제됨)`;
-              return `<li class="yarn-link-row"><span>${Utils.escapeHtml(label)} · ${l.amount}볼</span><button type="button" class="icon-btn sm" data-unlink-yarn="${l.yarnId}">연결 해제</button></li>`;
+              const label = liveYarn ? liveYarn.name : (l.yarnName || '실');
+              const meta = [liveYarn && liveYarn.color, `${l.amount}볼 사용`, !liveYarn && '삭제된 실'].filter(Boolean).join(' · ');
+              return `
+                <li class="link-item">
+                  <div class="link-item-main">
+                    <span class="link-item-name">${Utils.escapeHtml(label)}</span>
+                    <span class="link-item-meta">${Utils.escapeHtml(meta)}</span>
+                  </div>
+                  <button type="button" class="text-btn" data-unlink-yarn="${l.yarnId}">해제</button>
+                </li>`;
             }).join('')}
           </ul>`}
-        <button type="button" class="btn ghost sm" data-action="link-yarn">+ 실 연결</button>
       </div>
 
       <div class="info-block">
-        <h3>연결한 도안</h3>
+        <div class="section-title-row">
+          <h3>연결한 도안</h3>
+          ${project.patternId && Storage.getPattern(project.patternId) ? '' : `<button type="button" class="btn ghost sm" data-action="link-pattern">+ 도안 연결</button>`}
+        </div>
         ${project.patternId && Storage.getPattern(project.patternId) ? `
-          <p class="card-meta">${Utils.escapeHtml(Storage.getPattern(project.patternId).name)}</p>
-          <div class="form-actions">
-            <a class="btn ghost sm" href="#/pattern/${project.patternId}/for/${id}">도안 보기</a>
-            <button type="button" class="btn ghost sm" data-action="unlink-pattern">연결 해제</button>
-          </div>` : `
-          <p class="card-meta">연결된 도안이 없어요.</p>
-          <button type="button" class="btn ghost sm" data-action="link-pattern">+ 도안 연결</button>`}
+          <ul class="link-list">
+            <li class="link-item">
+              <div class="link-item-main">
+                <span class="link-item-name">${Utils.escapeHtml(Storage.getPattern(project.patternId).name)}</span>
+              </div>
+              <a class="text-btn primary" href="#/pattern/${project.patternId}/for/${id}">도안 보기</a>
+              <button type="button" class="text-btn" data-action="unlink-pattern">해제</button>
+            </li>
+          </ul>` : `
+          <p class="card-meta">연결된 도안이 없어요.</p>`}
       </div>
     `;
 
@@ -1873,7 +2011,7 @@ const App = (() => {
         if (!available.length) {
           const goUpload = await Modal.confirm({
             title: '등록된 도안이 없어요',
-            message: '도안 탭에서 먼저 도안을 추가해주세요.',
+            message: 'Patterns 탭에서 먼저 도안을 추가해주세요.',
             okLabel: '도안 추가하러 가기',
             cancelLabel: '닫기',
           });
@@ -1937,7 +2075,7 @@ const App = (() => {
     render();
   }
 
-  function mainCounterBlock(counter, canUndo) {
+  function mainCounterBlock(counter) {
     return `
       <div class="main-counter" data-counter-id="${counter.id}">
         <div class="counter-header">
@@ -1950,8 +2088,8 @@ const App = (() => {
         </button>
         <div class="counter-controls">
           <button class="btn ghost sm" data-action="counter-minus">-1</button>
-          <button class="btn ghost sm" data-action="counter-undo" ${canUndo ? '' : 'disabled'}>실행 취소</button>
           <button class="btn ghost sm" data-action="counter-reset">초기화</button>
+          <button class="btn primary sm" data-action="counter-plus">+1</button>
         </div>
       </div>`;
   }
@@ -1977,8 +2115,7 @@ const App = (() => {
     const scope = root.querySelector(`[data-counter-id="${counter.id}"]`);
     if (!scope) return;
 
-    const plusBtn = scope.querySelector('[data-action="counter-tap"], [data-action="counter-plus"]');
-    if (plusBtn) {
+    scope.querySelectorAll('[data-action="counter-tap"], [data-action="counter-plus"]').forEach((plusBtn) => {
       plusBtn.addEventListener('click', () => {
         if (!canTap(counter.id)) return;
         changeCounter(counter, 1, projectId);
@@ -1987,18 +2124,11 @@ const App = (() => {
         }
         render();
       });
-    }
+    });
     const minusBtn = scope.querySelector('[data-action="counter-minus"]');
     if (minusBtn) {
       minusBtn.addEventListener('click', () => {
         changeCounter(counter, -1, projectId);
-        render();
-      });
-    }
-    const undoBtn = scope.querySelector('[data-action="counter-undo"]');
-    if (undoBtn) {
-      undoBtn.addEventListener('click', () => {
-        undoLastAction();
         render();
       });
     }
@@ -2075,13 +2205,6 @@ const App = (() => {
       const el2 = root.querySelector(`[data-counter-id="${counterId}"]`);
       if (el2) el2.classList.remove('flash');
     }, 1200);
-  }
-
-  function undoLastAction() {
-    const action = Storage.getLastAction();
-    if (!action) return;
-    Storage.updateCounter(action.counterId, { value: action.prevValue });
-    Storage.setLastAction(null);
   }
 
   async function openCounterSettings(counter, projectId) {
@@ -2176,7 +2299,7 @@ const App = (() => {
     const last = settings.lastBackupAt;
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     if (!last || Date.now() - new Date(last).getTime() > THIRTY_DAYS) {
-      showBanner('마지막 백업이 오래됐어요. 도구 탭에서 백업할 수 있어요.', 'info', 5000);
+      showBanner('마지막 백업이 오래됐어요. Tools 탭에서 백업할 수 있어요.', 'info', 5000);
     }
   }
 
