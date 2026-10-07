@@ -271,6 +271,7 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 .field textarea { height: auto; padding: var(--s-2); }
 .field input:focus-visible, .field textarea:focus-visible, .field select:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .field.checkbox { flex-direction: row; align-items: center; gap: var(--s-2); }
+.field.checkbox input { width: 18px; height: 18px; padding: 0; margin: 0; flex-shrink: 0; accent-color: var(--primary); }
 .field.has-error input, .field.has-error textarea { border-color: var(--danger); }
 .field-error { color: var(--danger); font-size: 12px; margin: 0; }
 .search-field { margin-bottom: var(--s-3); }
@@ -283,7 +284,6 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 #ravelry-results:empty { display: none; }
 .results-list { margin-top: var(--s-4); }
 .results-list:empty { display: none; }
-.results-note { margin-top: var(--s-4); text-align: center; }
 
 .photo-grid { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .photo-thumb { position: relative; width: 72px; height: 72px; border-radius: var(--r-m); overflow: hidden; }
@@ -589,3 +589,9 @@ a.btn { text-decoration: none; }
 .pattern-card .card-title-row { min-height: 24px; }
 .pattern-card .card-meta { margin-top: 2px; }
 .pattern-card .counter-controls { margin-top: auto; padding-top: var(--s-1); }
+
+/* Patterns > Search: 검색창 · 필터 · 결과 간격 */
+.pattern-search { display: flex; flex-direction: column; gap: var(--s-2); }
+.pattern-search .search-field, .pattern-search .status-row { margin: 0; }
+.pattern-search .results-list { margin-top: var(--s-1); }
+.info-block .card-meta + .btn { margin-top: var(--s-2); }

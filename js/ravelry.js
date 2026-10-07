@@ -132,7 +132,7 @@ const Ravelry = (() => {
     };
   }
 
-  async function searchPatterns({ typeTerm, weight, craft, freeOnly, ravelryYarnId, page = 1 } = {}) {
+  async function searchPatterns({ query, typeTerm, weight, craft, freeOnly, ravelryYarnId, page = 1 } = {}) {
     const params = new URLSearchParams();
     if (ravelryYarnId) {
       // Yarn is linked to a specific Ravelry yarn record: prioritize patterns
@@ -142,7 +142,8 @@ const Ravelry = (() => {
     } else {
       // Not linked to Ravelry (e.g. a domestic/local yarn): fall back to
       // searching by weight + pattern type.
-      const terms = [typeTerm, weight ? WEIGHT_SEARCH_TERM[weight] : ''].filter(Boolean);
+      // query: Patterns 탭 Search에서 직접 입력한 검색어
+      const terms = [query, typeTerm, weight ? WEIGHT_SEARCH_TERM[weight] : ''].filter(Boolean);
       params.set('query', terms.join(' ') || '*');
     }
     if (craft) params.set('craft', craft);

@@ -54,6 +54,7 @@ const App = (() => {
     if (parts[0] === 'pattern') {
       if (parts[1] === 'new') return { name: 'pattern-form', params: {} };
       if (parts[1] === 'saved') return { name: 'pattern-list', params: { tab: 'saved' } };
+      if (parts[1] === 'search') return { name: 'pattern-list', params: { tab: 'search' } };
       if (parts[1] === 'recommend' && parts[2]) return { name: 'pattern-recommend', params: { yarnId: parts[2] } };
       if (parts[1] && parts[2] === 'edit') return { name: 'pattern-form', params: { id: parts[1] } };
       if (parts[1] && parts[2] === 'for' && parts[3]) return { name: 'pattern-viewer', params: { id: parts[1], projectId: parts[3] } };
@@ -886,7 +887,7 @@ const App = (() => {
   }
 
   function renderPatternList(tab) {
-    tab = tab === 'saved' ? 'saved' : 'owned';
+    tab = ['saved', 'search'].includes(tab) ? tab : 'owned';
     setActiveTab('pattern');
     revokePatternObjectUrl();
     const patterns = Storage.getPatterns();
@@ -900,6 +901,7 @@ const App = (() => {
       <div class="status-row" id="pattern-tab-switch">
         <button type="button" class="chip display-chip ${tab === 'owned' ? 'active' : ''}" data-tab="owned">Library</button>
         <button type="button" class="chip display-chip ${tab === 'saved' ? 'active' : ''}" data-tab="saved">Favorites</button>
+        <button type="button" class="chip display-chip ${tab === 'search' ? 'active' : ''}" data-tab="search">Search</button>
       </div>
       <div class="list" id="pattern-tab-body"></div>
     `;
@@ -918,12 +920,15 @@ const App = (() => {
           go(`#/pattern/${el.dataset.patternId}`);
         });
       });
+    } else if (tab === 'search') {
+      renderPatternSearch(body);
     } else {
       body.innerHTML = saved.length === 0
-        ? emptyState('Favorites가 비어 있어요', '실 보관함에서 "이 실로 뜰 도안 찾기"로 찜해보세요.')
+        ? emptyState('Favorites가 비어 있어요', 'Search 탭에서 Ravelry 도안을 찾아 찜해보세요.')
         : saved.map(savedPatternCard).join('');
       body.querySelectorAll('[data-unfavorite]').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation(); // 카드 클릭(Ravelry 새 탭)으로 번지지 않게
           Storage.unfavoritePattern(btn.dataset.unfavorite);
           showBanner('찜을 해제했어요.');
           renderPatternList('saved');
@@ -942,8 +947,149 @@ const App = (() => {
     root.querySelector('#pattern-tab-switch').addEventListener('click', (e) => {
       const btn = e.target.closest('[data-tab]');
       if (!btn) return;
-      go(btn.dataset.tab === 'saved' ? '#/pattern/saved' : '#/pattern');
+      go({ saved: '#/pattern/saved', search: '#/pattern/search' }[btn.dataset.tab] || '#/pattern');
     });
+  }
+
+  // Patterns > Search: Ravelry 도안 검색. 탭을 오가거나 Start Project 후 돌아와도 결과를 유지.
+  const patternSearchState = { query: '', craft: '', freeOnly: false, items: [], page: 1, hasMore: false, searched: false };
+
+  function renderPatternSearch(body) {
+    if (!Ravelry.isConfigured()) {
+      body.innerHTML = `
+        <div class="info-block">
+          <h3>Ravelry 연동이 필요해요</h3>
+          <p class="card-meta">Ravelry API 키를 설정하면 도안을 검색하고 찜할 수 있어요.</p>
+          <a class="btn primary sm" href="#/tools/ravelry">설정하러 가기</a>
+        </div>`;
+      return;
+    }
+    const st = patternSearchState;
+    body.innerHTML = `
+      <div class="pattern-search">
+      <label class="field search-field">
+        <div class="input-with-action">
+          <input type="search" id="pattern-query" value="${Utils.escapeHtml(st.query)}" placeholder="도안 이름, 디자이너 (예: cable hat)" enterkeyhint="search">
+          <button type="button" class="btn ghost sm" data-action="search">검색</button>
+        </div>
+      </label>
+      <div class="status-row" id="craft-filter">
+        <button type="button" class="chip ${st.craft === '' ? 'active' : ''}" data-craft="">전체</button>
+        <button type="button" class="chip ${st.craft === 'knitting' ? 'active' : ''}" data-craft="knitting">대바늘</button>
+        <button type="button" class="chip ${st.craft === 'crochet' ? 'active' : ''}" data-craft="crochet">코바늘</button>
+      </div>
+      <label class="field checkbox"><input type="checkbox" id="free-only" ${st.freeOnly ? 'checked' : ''}><span>무료 도안만 보기</span></label>
+      <div class="list results-list" id="pattern-results"></div>
+      </div>
+    `;
+
+    const queryInput = body.querySelector('#pattern-query');
+    const results = mountPatternResults(body.querySelector('#pattern-results'), (page) => Ravelry.searchPatterns({
+      query: st.query, craft: st.craft, freeOnly: st.freeOnly, page,
+    }), st);
+
+    const search = () => {
+      st.query = queryInput.value.trim();
+      st.freeOnly = body.querySelector('#free-only').checked;
+      if (!st.query) {
+        showBanner('검색어를 입력해주세요.', 'warn');
+        return;
+      }
+      results.run(true);
+    };
+    body.querySelector('[data-action="search"]').addEventListener('click', search);
+    queryInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      search();
+    });
+    body.querySelector('#craft-filter').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-craft]');
+      if (!btn) return;
+      st.craft = btn.dataset.craft;
+      body.querySelectorAll('#craft-filter .chip').forEach((c) => c.classList.toggle('active', c === btn));
+      if (st.query) search();
+    });
+    body.querySelector('#free-only').addEventListener('change', () => { if (st.query) search(); });
+  }
+
+  // Ravelry 도안 결과 목록 (Search 탭, 도안 추천 공용)
+  // state: { items, page, hasMore, searched } — 바깥에서 들고 있어서 화면을 다시 그려도 결과가 남음
+  function mountPatternResults(resultsEl, fetchPage, state) {
+    const find = (id) => state.items.find((r) => String(r.id) === String(id));
+    const favData = (p) => ({ ravelryPatternId: p.id, name: p.name, photoUrl: p.thumbnail, url: p.url, needleSize: p.needleSize });
+
+    function render() {
+      if (!state.items.length) {
+        resultsEl.innerHTML = state.searched ? emptyState('검색 결과가 없어요', '검색어나 필터를 바꿔서 다시 찾아보세요.') : '';
+        return;
+      }
+      resultsEl.innerHTML = state.items.map(patternResultCard).join('')
+        + (state.hasMore ? '<button type="button" class="btn ghost block" data-action="load-more">더 보기</button>' : '');
+
+      resultsEl.querySelectorAll('[data-favorite]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation(); // 카드 클릭(Ravelry 새 탭)으로 번지지 않게
+          const pt = find(btn.dataset.favorite);
+          if (!pt) return;
+          if (Storage.isPatternSaved(pt.id)) {
+            Storage.unfavoritePattern(pt.id);
+            setHeart(btn, false);
+            showBanner('찜을 해제했어요.');
+          } else {
+            Storage.saveFavoritePattern(favData(pt));
+            setHeart(btn, true);
+            showBanner('Favorites에 저장했어요.');
+          }
+        });
+      });
+      // Start Project: 아직 찜 안 한 도안이면 찜하고 시작 (작품에 Ravelry 링크로 연결됨)
+      resultsEl.querySelectorAll('[data-start-favorite]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation(); // 카드 클릭(Ravelry 새 탭)으로 번지지 않게
+          const pt = find(btn.dataset.startFavorite);
+          if (!pt) return;
+          if (!Storage.isPatternSaved(pt.id)) Storage.saveFavoritePattern(favData(pt));
+          go(`#/project/new/favorite/${pt.id}`);
+        });
+      });
+      // 카드를 누르면 Ravelry 도안 페이지를 새 탭으로
+      resultsEl.querySelectorAll('[data-ravelry-url]').forEach((card) => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('[data-favorite], [data-start-favorite]')) return;
+          window.open(card.dataset.ravelryUrl, '_blank', 'noopener');
+        });
+      });
+      const more = resultsEl.querySelector('[data-action="load-more"]');
+      if (more) more.addEventListener('click', () => run(false));
+    }
+
+    async function run(reset) {
+      const page = reset ? 1 : state.page + 1;
+      if (reset) {
+        resultsEl.innerHTML = '<p class="card-meta">찾는 중이에요...</p>';
+      } else {
+        const more = resultsEl.querySelector('[data-action="load-more"]');
+        if (more) { more.disabled = true; more.textContent = '불러오는 중이에요...'; }
+      }
+      let res;
+      try {
+        res = await fetchPage(page);
+      } catch (err) {
+        if (reset) { state.items = []; state.searched = false; }
+        render();
+        showBanner(Ravelry.errorMessage(err), 'warn');
+        return;
+      }
+      state.page = page;
+      state.items = reset ? res.items : state.items.concat(res.items);
+      state.hasMore = res.hasMore;
+      state.searched = true;
+      render();
+    }
+
+    render();
+    return { run };
   }
 
   // 예전에 찜해서 바늘 정보가 없는 Favorites를 Ravelry에서 한 번 더 불러와 채움.
@@ -1620,12 +1766,11 @@ const App = (() => {
         <button type="button" class="chip" data-craft="knitting">대바늘</button>
         <button type="button" class="chip" data-craft="crochet">코바늘</button>
       </div>
-      <label class="field checkbox"><input type="checkbox" id="free-only" checked><span>무료 도안만 보기</span></label>
+      <label class="field checkbox"><input type="checkbox" id="free-only"><span>무료 도안만 보기</span></label>
       <div class="form-actions">
         <button type="button" class="btn primary block" data-action="search">도안 찾기</button>
       </div>
       <div class="list results-list" id="pattern-results"></div>
-      <p class="card-meta results-note">검색 결과는 Ravelry에서 가져와요. 이 앱은 Ravelry에서 만들거나 제휴·보증한 앱이 아니에요.</p>
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
@@ -1646,74 +1791,16 @@ const App = (() => {
       root.querySelectorAll('#craft-filter .chip').forEach((c) => c.classList.toggle('active', c === btn));
     });
 
-    let currentPage = 1;
-    let hasMore = false;
-    let accumulated = [];
+    const results = mountPatternResults(root.querySelector('#pattern-results'), (page) => Ravelry.searchPatterns({
+      typeTerm: activeType,
+      weight: yarn.weight,
+      craft: activeCraft,
+      freeOnly: root.querySelector('#free-only').checked,
+      ravelryYarnId: yarn.ravelryYarnId,
+      page,
+    }), { items: [], page: 1, hasMore: false, searched: false });
 
-    function renderResults() {
-      const resultsEl = root.querySelector('#pattern-results');
-      resultsEl.innerHTML = accumulated.map(patternResultCard).join('')
-        + (hasMore ? `<button type="button" class="btn ghost block" data-action="load-more">더 보기</button>` : '');
-
-      resultsEl.querySelectorAll('[data-favorite]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const p = accumulated.find((r) => String(r.id) === btn.dataset.favorite);
-          if (!p) return;
-          if (Storage.isPatternSaved(p.id)) {
-            Storage.unfavoritePattern(p.id);
-            setHeart(btn, false);
-            showBanner('찜을 해제했어요.');
-          } else {
-            Storage.saveFavoritePattern({ ravelryPatternId: p.id, name: p.name, photoUrl: p.thumbnail, url: p.url, needleSize: p.needleSize });
-            setHeart(btn, true);
-            showBanner('Favorites에 저장했어요.');
-          }
-        });
-      });
-
-      const loadMoreBtn = resultsEl.querySelector('[data-action="load-more"]');
-      if (loadMoreBtn) loadMoreBtn.addEventListener('click', () => runSearch(false));
-    }
-
-    async function runSearch(reset) {
-      const resultsEl = root.querySelector('#pattern-results');
-      if (reset) {
-        currentPage = 1;
-        accumulated = [];
-      } else {
-        currentPage += 1;
-      }
-      resultsEl.innerHTML = reset
-        ? `<p class="card-meta">찾는 중이에요...</p>`
-        : accumulated.map(patternResultCard).join('') + `<p class="card-meta">더 불러오는 중이에요...</p>`;
-
-      let res;
-      try {
-        res = await Ravelry.searchPatterns({
-          typeTerm: activeType,
-          weight: yarn.weight,
-          craft: activeCraft,
-          freeOnly: root.querySelector('#free-only').checked,
-          ravelryYarnId: yarn.ravelryYarnId,
-          page: currentPage,
-        });
-      } catch (err) {
-        resultsEl.innerHTML = reset ? '' : accumulated.map(patternResultCard).join('');
-        showBanner(Ravelry.errorMessage(err), 'warn');
-        return;
-      }
-
-      accumulated = accumulated.concat(res.items);
-      hasMore = res.hasMore;
-
-      if (!accumulated.length) {
-        resultsEl.innerHTML = emptyState('검색 결과가 없어요', '필터를 줄여서 다시 찾아보세요.');
-        return;
-      }
-      renderResults();
-    }
-
-    root.querySelector('[data-action="search"]').addEventListener('click', () => runSearch(true));
+    root.querySelector('[data-action="search"]').addEventListener('click', () => results.run(true));
   }
 
   function patternResultCard(p) {
@@ -1722,7 +1809,7 @@ const App = (() => {
       ? (p.metersMax && p.metersMax !== p.metersMin ? `${p.metersMin}~${p.metersMax}m 필요` : `약 ${p.metersMin}m 필요`)
       : '필요 실 양 정보 없음';
     return `
-      <div class="card">
+      <div class="card" data-ravelry-url="${Utils.escapeHtml(p.url)}">
         <div class="card-thumb">${p.thumbnail ? `<img src="${p.thumbnail}" alt="">` : `<div class="thumb-stitch is-pattern">${Icons.stitch('pattern', 0.4)}</div>`}</div>
         <div class="card-body">
           <div class="card-title-row">
@@ -1732,7 +1819,7 @@ const App = (() => {
           <p class="card-sub">${Utils.escapeHtml(p.designer)} · ${p.free ? '무료' : '유료'}</p>
           <p class="card-meta">${[yardageText, p.needleSize && `바늘 ${Utils.escapeHtml(p.needleSize)}`].filter(Boolean).join(' · ')}</p>
           <div class="counter-controls">
-            <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry</a>
+            <button type="button" class="btn primary sm display-btn" data-start-favorite="${p.id}">Start Project</button>
           </div>
         </div>
       </div>`;
