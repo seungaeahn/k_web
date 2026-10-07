@@ -215,6 +215,8 @@ const Storage = (() => {
       weight: data.weight || '',
       material: data.material || '',
       amount: Math.max(0, Number(data.amount) || 0),
+      // 보유량 단위: 'ball'(볼) 또는 'g'(콘사처럼 무게로 관리)
+      unit: data.unit === 'g' ? 'g' : 'ball',
       lengthPerBall: data.lengthPerBall != null && data.lengthPerBall !== '' ? Number(data.lengthPerBall) : null,
       weightPerBall: data.weightPerBall != null && data.weightPerBall !== '' ? Number(data.weightPerBall) : null,
       photo: data.photo || null,
@@ -240,13 +242,36 @@ const Storage = (() => {
   function getProjectsLinkedToYarn(yarnId) {
     return getProjects().filter((p) => (p.yarns || []).some((l) => l.yarnId === yarnId));
   }
-  function linkYarnToProject(projectId, yarnId, amount) {
+  // 작품-실 연결: 연결할 때는 보유량을 빼지 않고(pending), 다 뜬 뒤 사용량을 기록할 때 뺌.
+  // 예전 방식 연결({ amount })은 연결할 때 이미 볼 수만큼 빠졌으므로 "기록됨"으로 봄.
+  const round2 = (n) => Math.round(n * 100) / 100;
+  function yarnUnit(yarn) {
+    return yarn && yarn.unit === 'g' ? 'g' : 'ball';
+  }
+  function linkUsedAmount(link) {
+    if (!link || link.pending) return 0;
+    return link.used != null ? link.used : (link.amount || 0);
+  }
+  function linkYarnToProject(projectId, yarnId) {
     const project = getProject(projectId);
     const yarn = getYarn(yarnId);
     if (!project || !yarn) return null;
-    const amt = Math.max(0, Number(amount) || 0);
-    updateYarn(yarnId, { amount: Math.max(0, yarn.amount - amt) });
-    const yarns = [...(project.yarns || []), { yarnId, yarnName: yarn.name, amount: amt }];
+    if ((project.yarns || []).some((l) => l.yarnId === yarnId)) return project;
+    const yarns = [...(project.yarns || []), { yarnId, yarnName: yarn.name, unit: yarnUnit(yarn), pending: true, used: null }];
+    return updateProject(projectId, { yarns });
+  }
+  // 사용량 기록: 이전에 기록한 양은 되돌린 뒤 새 사용량만큼 보유량에서 뺌
+  function recordYarnUsage(projectId, yarnId, used) {
+    const project = getProject(projectId);
+    const yarn = getYarn(yarnId);
+    if (!project || !yarn) return null;
+    const link = (project.yarns || []).find((l) => l.yarnId === yarnId);
+    if (!link) return null;
+    const amt = round2(Math.max(0, Number(used) || 0));
+    updateYarn(yarnId, { amount: round2(Math.max(0, yarn.amount + linkUsedAmount(link) - amt)) });
+    const yarns = (project.yarns || []).map((l) => (l.yarnId === yarnId
+      ? { yarnId, yarnName: yarn.name, unit: yarnUnit(yarn), pending: false, used: amt }
+      : l));
     return updateProject(projectId, { yarns });
   }
   function unlinkYarnFromProject(projectId, yarnId, restore) {
@@ -257,14 +282,14 @@ const Storage = (() => {
     updateProject(projectId, { yarns });
     if (restore && link) {
       const yarn = getYarn(yarnId);
-      if (yarn) updateYarn(yarnId, { amount: yarn.amount + link.amount });
+      if (yarn) updateYarn(yarnId, { amount: round2(yarn.amount + linkUsedAmount(link)) });
     }
     return true;
   }
   function restoreYarnAmounts(project) {
     (project.yarns || []).forEach((link) => {
       const yarn = getYarn(link.yarnId);
-      if (yarn) updateYarn(link.yarnId, { amount: yarn.amount + link.amount });
+      if (yarn) updateYarn(link.yarnId, { amount: round2(yarn.amount + linkUsedAmount(link)) });
     });
   }
 
@@ -410,25 +435,66 @@ const Storage = (() => {
   }
 
   // ---- Backup ----
-  function exportBackup(includePhotos) {
+  // version 2: 도안(Library)·Favorites·설정(하이라이트 색 등)·도안 파일까지 포함.
+  // Ravelry API 키·시크릿은 백업 파일이 공유될 수 있어서 넣지 않음.
+  const BACKUP_SETTING_KEYS = ['highlightColor'];
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+  function dataUrlToBlob(dataUrl) {
+    const [head, body] = String(dataUrl).split(',');
+    const mime = (head.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+    const bin = atob(body || '');
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+
+  async function exportBackup(includePhotos, includePatternFiles) {
     const projects = getProjects().map((p) => (includePhotos ? p : { ...p, photos: [], mainPhotoIndex: 0 }));
     const yarns = getYarns().map((y) => (includePhotos ? y : { ...y, photo: null }));
+    const patterns = getPatterns();
+    const settings = getSettings();
+    const patternFiles = {};
+    if (includePatternFiles) {
+      for (const pt of patterns) {
+        try {
+          const blob = await FileStore.get(pt.id);
+          if (blob) patternFiles[pt.id] = await blobToDataUrl(blob);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
     const payload = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       includesPhotos: !!includePhotos,
+      includesPatternFiles: !!includePatternFiles,
       data: {
         projects,
         counters: getCounters(),
         sessions: getSessions(),
         yarns,
         abbreviations: getAbbreviations(),
+        patterns,
+        savedPatterns: getSavedPatterns(),
+        settings: Object.fromEntries(BACKUP_SETTING_KEYS.filter((k) => settings[k] != null).map((k) => [k, settings[k]])),
+        patternFiles,
       },
     };
     saveSettings({ lastBackupAt: new Date().toISOString() });
     return payload;
   }
-  function importBackup(parsed) {
+
+  // 반환: false(형식 오류) 또는 { patternFilesRestored }
+  async function importBackup(parsed) {
     if (!parsed || typeof parsed !== 'object' || !parsed.data) return false;
     const { data } = parsed;
     if (!Array.isArray(data.projects) || !Array.isArray(data.counters) || !Array.isArray(data.sessions)
@@ -438,9 +504,28 @@ const Storage = (() => {
     saveSessions(data.sessions);
     saveYarns(data.yarns);
     saveAbbreviations(data.abbreviations);
+    // 예전(version 1) 백업에는 도안·Favorites가 없으므로 지금 있는 것을 그대로 둠
+    if (Array.isArray(data.patterns)) savePatterns(data.patterns);
+    if (Array.isArray(data.savedPatterns)) saveSavedPatterns(data.savedPatterns);
+    if (data.settings && typeof data.settings === 'object') {
+      const patch = {};
+      BACKUP_SETTING_KEYS.forEach((k) => { if (data.settings[k] != null) patch[k] = data.settings[k]; });
+      saveSettings(patch);
+    }
+    let patternFilesRestored = 0;
+    if (data.patternFiles && typeof data.patternFiles === 'object') {
+      for (const [id, dataUrl] of Object.entries(data.patternFiles)) {
+        try {
+          await FileStore.put(id, dataUrlToBlob(dataUrl));
+          patternFilesRestored += 1;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
     setActiveSession(null);
     setLastAction(null);
-    return true;
+    return { patternFilesRestored };
   }
 
   // ---- Settings ----
@@ -479,7 +564,7 @@ const Storage = (() => {
     getCounters, getCountersByProject, createCounter, updateCounter, deleteCounter,
     getSessions, getSessionsByProject, addSession, updateSession, deleteSession,
     getYarns, getYarn, createYarn, updateYarn, deleteYarn,
-    getProjectsLinkedToYarn, linkYarnToProject, unlinkYarnFromProject, restoreYarnAmounts,
+    getProjectsLinkedToYarn, linkYarnToProject, recordYarnUsage, linkUsedAmount, unlinkYarnFromProject, restoreYarnAmounts,
     getAbbreviations, findAbbreviationByTerm, createAbbreviation, updateAbbreviation, deleteAbbreviation,
     getMissingDefaultAbbreviations, restoreDefaultAbbreviations,
     getPatterns, getPattern, createPattern, updatePattern, deletePattern,

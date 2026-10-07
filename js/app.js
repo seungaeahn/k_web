@@ -293,15 +293,151 @@ const App = (() => {
     renderBody();
   }
 
+  // 바늘 굵기 드롭다운: 자주 쓰는 mm 굵기(US 호수 함께) + 직접 입력.
+  // 실제 값은 input[name="needleSize"]에 "4mm" 형식으로 들어감. Ravelry 범위("4–4.5mm")나 목록에 없는 값은 직접 입력.
+  const NEEDLE_SIZES = [
+    [2, '0'], [2.25, '1'], [2.5, '1.5'], [2.75, '2'], [3, '2.5'], [3.25, '3'], [3.5, '4'], [3.75, '5'],
+    [4, '6'], [4.5, '7'], [5, '8'], [5.5, '9'], [6, '10'], [6.5, '10.5'], [7, ''], [8, '11'],
+    [9, '13'], [10, '15'], [12, '17'], [15, '19'],
+  ];
+  const needleValue = (mm) => `${mm}mm`;
+  const isKnownNeedle = (v) => NEEDLE_SIZES.some(([mm]) => needleValue(mm) === v);
+  function needleFieldHtml(value, placeholder = '예: 4–4.5mm') {
+    const v = String(value || '').trim();
+    const custom = v && !isKnownNeedle(v);
+    return `
+      <div class="needle-field" data-needle-field>
+        <select data-needle-select aria-label="바늘 굵기">
+          <option value="">선택 안 함</option>
+          ${NEEDLE_SIZES.map(([mm, us]) => `<option value="${needleValue(mm)}" ${needleValue(mm) === v ? 'selected' : ''}>${mm}mm${us ? ` (US ${us})` : ''}</option>`).join('')}
+          <option value="__custom" ${custom ? 'selected' : ''}>직접 입력</option>
+        </select>
+        <input type="text" name="needleSize" value="${Utils.escapeHtml(v)}" placeholder="${placeholder}" ${custom ? '' : 'hidden'}>
+      </div>`;
+  }
+  // 코드로 바늘 값을 넣을 때(도안·Ravelry에서 채우기) 드롭다운도 같이 맞춤
+  function setNeedleValue(input, value) {
+    if (!input) return;
+    input.value = String(value || '').trim();
+    const wrap = input.closest('[data-needle-field]');
+    if (!wrap) return;
+    const custom = input.value && !isKnownNeedle(input.value);
+    wrap.querySelector('[data-needle-select]').value = !input.value ? '' : (custom ? '__custom' : input.value);
+    input.hidden = !custom;
+  }
+  root.addEventListener('change', (e) => {
+    const select = e.target.closest && e.target.closest('[data-needle-select]');
+    if (!select) return;
+    const input = select.closest('[data-needle-field]').querySelector('input');
+    if (select.value === '__custom') {
+      if (isKnownNeedle(input.value)) input.value = '';
+      input.hidden = false;
+      input.focus();
+    } else {
+      input.value = select.value;
+      input.hidden = true;
+    }
+  });
+
+  // 실 보유량 표시: 3볼 / 2.5볼 / 820g
+  function formatYarnAmount(value, unit) {
+    const n = Math.round((Number(value) || 0) * 100) / 100;
+    return unit === 'g' ? `${n}g` : `${n}볼`;
+  }
+  const yarnUnitOf = (yarn) => (yarn && yarn.unit === 'g' ? 'g' : 'ball');
+
+  // 이 실을 연결해두고 아직 사용량을 기록하지 않은 작품들
+  function projectsUsingYarn(yarnId) {
+    return Storage.getProjectsLinkedToYarn(yarnId)
+      .filter((proj) => (proj.yarns || []).some((l) => l.yarnId === yarnId && l.pending));
+  }
+
+  // 사용량 기록: 볼 단위는 쓴 볼 수, g 단위(콘사)는 지금 남은 무게를 받아 쓴 양을 계산.
+  // 비워둔 실은 기록하지 않음. 이미 기록한 실은 다시 고칠 수 있음.
+  async function openYarnUsageModal(projectId, yarnIds, { title = '사용량 기록', intro = '' } = {}) {
+    const project = Storage.getProject(projectId);
+    if (!project) return false;
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const rows = yarnIds.map((yarnId, i) => {
+      const yarn = Storage.getYarn(yarnId);
+      const link = (project.yarns || []).find((l) => l.yarnId === yarnId);
+      if (!yarn || !link) return null;
+      // 이 작품에 쓰기 전 보유량 (이미 기록한 양은 되돌려서 계산)
+      const before = round2(yarn.amount + Storage.linkUsedAmount(link));
+      const prevUsed = link.pending ? null : Storage.linkUsedAmount(link);
+      return { i, yarnId, yarn, before, prevUsed, unit: yarnUnitOf(yarn) };
+    }).filter(Boolean);
+    if (!rows.length) return false;
+
+    const res = await Modal.open({
+      title,
+      bodyHtml: `
+        ${intro ? `<p>${intro}</p>` : ''}
+        ${rows.map((r) => (r.unit === 'g' ? `
+          <label class="field">
+            <span>${Utils.escapeHtml(r.yarn.name)} · 쓰기 전 ${formatYarnAmount(r.before, 'g')}</span>
+            <input type="number" min="0" step="any" inputmode="decimal" data-field="y${r.i}" placeholder="지금 남은 무게 (g)" value="${r.prevUsed != null ? round2(r.before - r.prevUsed) : ''}">
+          </label>` : `
+          <label class="field">
+            <span>${Utils.escapeHtml(r.yarn.name)} · 보유 ${formatYarnAmount(r.before, 'ball')}</span>
+            <input type="number" min="0" step="0.5" inputmode="decimal" data-field="y${r.i}" placeholder="쓴 볼 수" value="${r.prevUsed != null ? r.prevUsed : ''}">
+          </label>`)).join('')}
+        <p class="card-meta">g 단위 실(콘사)은 저울에 올린 남은 무게를 적으면 쓴 양을 계산해요. 비워두면 기록하지 않아요.</p>`,
+      buttons: [{ id: 'cancel', label: '나중에', variant: 'ghost' }, { id: 'ok', label: '기록', variant: 'primary' }],
+    });
+    if (res.id !== 'ok') return false;
+
+    let count = 0;
+    rows.forEach((r) => {
+      const raw = String(res.values[`y${r.i}`] == null ? '' : res.values[`y${r.i}`]).trim();
+      if (raw === '') return;
+      const n = Math.max(0, Number(raw) || 0);
+      const used = r.unit === 'g' ? Math.max(0, r.before - n) : n;
+      Storage.recordYarnUsage(projectId, r.yarnId, used);
+      count += 1;
+    });
+    if (count) showBanner(`실 ${count}개의 사용량을 기록했어요.`);
+    return count > 0;
+  }
+
+  // 고르기 창(Modal.pick) 항목: 최근에 추가한 것부터 (같은 시각이면 나중에 추가한 것 먼저)
+  const newestFirst = (key) => (a, b) => String(b[key] || '').localeCompare(String(a[key] || ''));
+  function libraryPickItems() {
+    return [...Storage.getPatterns()].reverse().sort(newestFirst('createdAt')).map((pt) => ({
+      value: `pattern:${pt.id}`,
+      label: pt.name,
+      meta: [pt.fileType === 'pdf' ? `PDF · ${pt.pageCount}쪽` : '이미지', pt.needleSize && `바늘 ${pt.needleSize}`].filter(Boolean).join(' · '),
+    }));
+  }
+  function favoritePickItems() {
+    return [...Storage.getSavedPatterns()].reverse().sort(newestFirst('savedAt')).map((f) => ({
+      value: `favorite:${f.ravelryPatternId}`,
+      label: f.name,
+      meta: ['Ravelry', f.needleSize && `바늘 ${f.needleSize}`].filter(Boolean).join(' · '),
+    }));
+  }
+  // 실: 보유량 있는 실 먼저, 그 안에서 최근 것부터
+  function yarnPickItems(yarns) {
+    return [...yarns].reverse()
+      .sort((a, b) => (b.amount > 0) - (a.amount > 0) || newestFirst('createdAt')(a, b))
+      .map((y) => ({
+        value: y.id,
+        label: y.name,
+        meta: [y.color, y.weight, `보유 ${formatYarnAmount(y.amount, yarnUnitOf(y))}`].filter(Boolean).join(' · '),
+      }));
+  }
+
   function yarnCard(y) {
     const empty = !(y.amount > 0);
+    const using = projectsUsingYarn(y.id);
     return `
       <div class="card ${empty ? 'is-empty' : ''}" data-yarn-id="${y.id}">
         <div class="card-thumb">${y.photo ? `<img src="${y.photo}" alt="">` : `<div class="thumb-stitch is-yarn">${Icons.stitch('yarn', 0.4)}</div>`}</div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(y.name)}</h3></div>
           <p class="card-sub">${[y.color, y.weight, y.material].filter(Boolean).map((v) => Utils.escapeHtml(v)).join(' · ') || '-'}</p>
-          <p class="card-meta">${[empty ? '보유량 없음' : `보유 ${y.amount}볼`, y.needleSize && `바늘 ${Utils.escapeHtml(y.needleSize)}`].filter(Boolean).join(' · ')}</p>
+          <p class="card-meta">${[empty ? '보유량 없음' : `보유 ${formatYarnAmount(y.amount, yarnUnitOf(y))}`, y.needleSize && `바늘 ${Utils.escapeHtml(y.needleSize)}`].filter(Boolean).join(' · ')}</p>
+          ${using.length ? `<p class="card-meta yarn-in-use">${using.map((proj) => Utils.escapeHtml(proj.name)).join(', ')}에서 사용 중</p>` : ''}
         </div>
       </div>`;
   }
@@ -345,16 +481,22 @@ const App = (() => {
         </label>
         <label class="field">
           <span>권장 바늘</span>
-          <input type="text" name="needleSize" value="${yarn ? Utils.escapeHtml(yarn.needleSize || '') : ''}" placeholder="예: 4–4.5mm">
+          ${needleFieldHtml(yarn && yarn.needleSize)}
         </label>
         <label class="field">
           <span>소재</span>
           <input type="text" name="material" value="${yarn ? Utils.escapeHtml(yarn.material) : ''}" placeholder="예: 메리노 울 100%">
         </label>
-        <label class="field">
-          <span>보유량 (볼 수)</span>
-          <input type="number" name="amount" min="0" step="1" value="${yarn ? yarn.amount : 0}">
-        </label>
+        <div class="field">
+          <span>보유량</span>
+          <div class="amount-row">
+            <input type="number" name="amount" min="0" step="any" inputmode="decimal" value="${yarn ? yarn.amount : 0}">
+            <select name="unit" aria-label="보유량 단위">
+              <option value="ball" ${yarnUnitOf(yarn) === 'ball' ? 'selected' : ''}>볼</option>
+              <option value="g" ${yarnUnitOf(yarn) === 'g' ? 'selected' : ''}>g (콘사)</option>
+            </select>
+          </div>
+        </div>
         <div class="grid-2">
           <label class="field"><span>볼당 길이(m)</span><input type="number" name="lengthPerBall" min="0" value="${yarn && yarn.lengthPerBall != null ? yarn.lengthPerBall : ''}"></label>
           <label class="field"><span>볼당 무게(g)</span><input type="number" name="weightPerBall" min="0" value="${yarn && yarn.weightPerBall != null ? yarn.weightPerBall : ''}"></label>
@@ -369,7 +511,8 @@ const App = (() => {
             <ul class="yarn-link-list">
               ${linkedProjects.map((p) => {
                 const link = (p.yarns || []).find((l) => l.yarnId === id);
-                return `<li class="yarn-link-row"><span>${Utils.escapeHtml(p.name)} · ${link ? link.amount : 0}볼 사용</span></li>`;
+                const usage = !link || link.pending ? '사용 중' : `${formatYarnAmount(Storage.linkUsedAmount(link), yarnUnitOf(yarn))} 사용`;
+                return `<li class="yarn-link-row"><span>${Utils.escapeHtml(p.name)} · ${usage}</span></li>`;
               }).join('')}
             </ul>
           </div>` : ''}
@@ -425,7 +568,7 @@ const App = (() => {
               if (detail.material) root.querySelector('[name="material"]').value = detail.material;
               if (detail.lengthPerBall != null) root.querySelector('[name="lengthPerBall"]').value = detail.lengthPerBall;
               if (detail.weightPerBall != null) root.querySelector('[name="weightPerBall"]').value = detail.weightPerBall;
-              if (detail.needleSize) root.querySelector('[name="needleSize"]').value = detail.needleSize;
+              if (detail.needleSize) setNeedleValue(root.querySelector('[name="needleSize"]'), detail.needleSize);
               ravelryYarnId = detail.ravelryYarnId;
               resultsEl.innerHTML = '';
               showBanner('실 정보를 불러왔어요.');
@@ -500,6 +643,7 @@ const App = (() => {
         needleSize: String(fd.get('needleSize') || '').trim(),
         material: String(fd.get('material') || '').trim(),
         amount: Math.max(0, Number(fd.get('amount')) || 0),
+        unit: fd.get('unit') === 'g' ? 'g' : 'ball',
         lengthPerBall: fd.get('lengthPerBall') ? Number(fd.get('lengthPerBall')) : null,
         weightPerBall: fd.get('weightPerBall') ? Number(fd.get('weightPerBall')) : null,
         photo,
@@ -757,32 +901,47 @@ const App = (() => {
         <button class="icon-btn" data-action="back">←</button>
         <h1 class="display-title">Backup</h1>
       </header>
-      <div class="info-block">
-        <h3>마지막 백업</h3>
-        <p class="card-meta">${settings.lastBackupAt ? Utils.formatDateTime(settings.lastBackupAt) : '아직 백업한 적 없어요'}</p>
-      </div>
-      <div class="form">
+      <div class="info-block backup-card">
+        <h3>내보내기</h3>
+        <p class="card-meta">작품, 실, 도안, Favorites, 약어를 백업 파일(.json)로 저장해요. 마지막 백업: ${settings.lastBackupAt ? Utils.formatDateTime(settings.lastBackupAt) : '아직 없어요'}</p>
         <label class="field checkbox">
           <input type="checkbox" id="include-photos" checked>
-          <span>사진 포함해서 내보내기</span>
+          <span>작품·실 사진 포함</span>
         </label>
-        <div class="form-actions">
-          <button type="button" class="btn primary block" data-action="export">데이터 내보내기</button>
-        </div>
+        <label class="field checkbox">
+          <input type="checkbox" id="include-pattern-files" checked>
+          <span>도안 파일(PDF·이미지) 포함</span>
+        </label>
+        <p class="card-meta">사진과 도안 파일을 넣으면 백업 파일이 커질 수 있어요. Ravelry API 키는 백업에 들어가지 않아요.</p>
+        <button type="button" class="btn primary block" data-action="export">데이터 내보내기</button>
       </div>
-      <div class="form">
-        <label class="field">
-          <span>백업 파일 가져오기</span>
-          <input type="file" id="import-input" accept="application/json,.json">
+      <div class="info-block backup-card">
+        <h3>가져오기</h3>
+        <p class="card-meta">백업 파일로 데이터를 되살려요. 지금 있는 데이터는 모두 파일 내용으로 바뀌어요.</p>
+        <label class="btn ghost block">
+          <input type="file" id="import-input" accept="application/json,.json" hidden>
+          백업 파일 선택
         </label>
       </div>
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
 
-    root.querySelector('[data-action="export"]').addEventListener('click', () => {
+    root.querySelector('[data-action="export"]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
       const includePhotos = root.querySelector('#include-photos').checked;
-      const payload = Storage.exportBackup(includePhotos);
+      const includePatternFiles = root.querySelector('#include-pattern-files').checked;
+      btn.disabled = true;
+      btn.textContent = '백업 파일 만드는 중...';
+      let payload;
+      try {
+        payload = await Storage.exportBackup(includePhotos, includePatternFiles);
+      } catch (err) {
+        console.error(err);
+        showBanner('백업 파일을 만들지 못했어요.', 'warn');
+        renderBackup();
+        return;
+      }
       const json = JSON.stringify(payload, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -816,12 +975,12 @@ const App = (() => {
       try {
         const text = await file.text();
         const parsed = JSON.parse(text);
-        const ok = Storage.importBackup(parsed);
-        if (!ok) {
+        const result = await Storage.importBackup(parsed);
+        if (!result) {
           showBanner('백업 파일 형식이 올바르지 않아요.', 'warn');
           return;
         }
-        showBanner('데이터를 가져왔어요.');
+        showBanner(result.patternFilesRestored ? `데이터와 도안 파일 ${result.patternFilesRestored}개를 가져왔어요.` : '데이터를 가져왔어요.');
         go('#/');
       } catch (err) {
         console.error(err);
@@ -1202,7 +1361,7 @@ const App = (() => {
         </label>
         <label class="field">
           <span>바늘 굵기</span>
-          <input type="text" name="needleSize" value="${pattern ? Utils.escapeHtml(pattern.needleSize || '') : ''}" placeholder="예: 4mm (선택)">
+          ${needleFieldHtml(pattern && pattern.needleSize)}
         </label>
         <div class="field">
           <span>도안 파일 <em>*</em></span>
@@ -1780,7 +1939,10 @@ const App = (() => {
       return;
     }
 
-    const availableMeters = Math.round((yarn.amount || 0) * yarn.lengthPerBall);
+    const ballsOwned = yarnUnitOf(yarn) === 'g'
+      ? (yarn.weightPerBall ? (yarn.amount || 0) / yarn.weightPerBall : 0)
+      : (yarn.amount || 0);
+    const availableMeters = Math.round(ballsOwned * yarn.lengthPerBall);
 
     root.innerHTML = `
       <header class="page-header with-back">
@@ -1887,6 +2049,7 @@ const App = (() => {
     let source = editing ? null : patternSource(from);
     // 도안에서 시작하면 보통 "나중에 뜰 것"이라 CO Waiting List가 기본
     let status = source ? 'onhold' : 'active';
+    let pickedYarns = []; // New Project에서 고른 실: { yarnId } (사용량은 나중에 기록)
 
     root.innerHTML = `
       <header class="page-header with-back">
@@ -1915,13 +2078,19 @@ const App = (() => {
           <span>시작일</span>
           <input type="date" name="startDate" value="${project ? (project.startDate || '') : Utils.todayStr()}">
         </label>
-        <label class="field">
-          <span>사용 실</span>
-          <input type="text" name="yarnText" value="${project ? Utils.escapeHtml(project.yarnText) : ''}" placeholder="예: 코스모스 그레이 3볼">
-        </label>
+        ${editing ? `
+          <label class="field">
+            <span>사용 실</span>
+            <input type="text" name="yarnText" value="${Utils.escapeHtml(project.yarnText)}" placeholder="예: 코스모스 그레이 3볼">
+          </label>` : `
+          <div class="field">
+            <span>사용 실</span>
+            <div id="yarn-picks"></div>
+            <input type="text" name="yarnText" placeholder="보관함에 없는 실 직접 입력">
+          </div>`}
         <label class="field">
           <span>바늘 호수</span>
-          <input type="text" name="needleSize" value="${project ? Utils.escapeHtml(project.needleSize) : ''}" placeholder="예: 4.5mm">
+          ${needleFieldHtml(project && project.needleSize)}
         </label>
         <label class="field">
           <span>메모</span>
@@ -1976,7 +2145,7 @@ const App = (() => {
               <button type="button" class="text-btn" data-action="clear-pattern">빼기</button>
             </li>
           </ul>`
-          : '<button type="button" class="btn ghost block" data-action="pick-pattern">도안에서 고르기</button>';
+          : '<button type="button" class="btn ghost block display-font" data-action="pick-pattern">Choose Pattern</button>';
         sourceEl.querySelectorAll('[data-action="pick-pattern"]').forEach((b) => b.addEventListener('click', pickPattern));
         const clearBtn = sourceEl.querySelector('[data-action="clear-pattern"]');
         if (clearBtn) clearBtn.addEventListener('click', () => { source = null; renderSource(); });
@@ -1990,7 +2159,7 @@ const App = (() => {
         const needleInput = root.querySelector('[name="needleSize"]');
         const wasAuto = (input, key) => prev && input.value.trim() === (prev[key] || '');
         if (overwrite || !nameInput.value.trim() || wasAuto(nameInput, 'name')) nameInput.value = next.name;
-        if (next.needleSize && (overwrite || !needleInput.value.trim() || wasAuto(needleInput, 'needleSize'))) needleInput.value = next.needleSize;
+        if (next.needleSize && (overwrite || !needleInput.value.trim() || wasAuto(needleInput, 'needleSize'))) setNeedleValue(needleInput, next.needleSize);
         renderSource();
       };
 
@@ -2001,25 +2170,65 @@ const App = (() => {
           showBanner('Library나 Favorites에 도안이 없어요.', 'warn');
           return;
         }
-        const res = await Modal.open({
-          title: '도안에서 고르기',
-          bodyHtml: `
-            <label class="field"><span>도안</span>
-              <select data-field="src">
-                ${library.length ? `<optgroup label="Library">${library.map((pt) => `<option value="pattern:${pt.id}" ${source && source.key === `pattern:${pt.id}` ? 'selected' : ''}>${Utils.escapeHtml(pt.name)}</option>`).join('')}</optgroup>` : ''}
-                ${favorites.length ? `<optgroup label="Favorites">${favorites.map((f) => `<option value="favorite:${f.ravelryPatternId}" ${source && source.key === `favorite:${f.ravelryPatternId}` ? 'selected' : ''}>${Utils.escapeHtml(f.name)}</option>`).join('')}</optgroup>` : ''}
-              </select>
-            </label>`,
-          buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '고르기', variant: 'primary' }],
+        const picked = await Modal.pick({
+          title: 'Choose Pattern',
+          placeholder: '도안 이름으로 찾기',
+          sections: [
+            { label: 'Library', items: libraryPickItems() },
+            { label: 'Favorites', items: favoritePickItems() },
+          ],
         });
-        if (res.id !== 'ok' || !res.values.src) return;
-        const [kind, ...rest] = String(res.values.src).split(':');
+        if (!picked) return;
+        const [kind, ...rest] = String(picked).split(':');
         const next = patternSource({ kind, id: rest.join(':') });
         if (next) applySource(next, false);
       }
 
       renderStatus();
       if (source) applySource(source, true); else renderSource();
+
+      // 사용 실: 실 보관함에서 골라 연결 (저장할 때 보유량에서 사용할 볼 수만큼 빠짐)
+      const yarnPicksEl = root.querySelector('#yarn-picks');
+      const renderYarnPicks = () => {
+        const rows = pickedYarns.map((pick) => {
+          const y = Storage.getYarn(pick.yarnId);
+          if (!y) return '';
+          const meta = [y.color, y.weight, `보유 ${formatYarnAmount(y.amount, yarnUnitOf(y))}`].filter(Boolean).join(' · ');
+          return `
+            <li class="link-item">
+              <div class="link-item-main">
+                <span class="link-item-name">${Utils.escapeHtml(y.name)}</span>
+                <span class="link-item-meta">${Utils.escapeHtml(meta)}</span>
+              </div>
+              <button type="button" class="text-btn" data-unpick-yarn="${pick.yarnId}">빼기</button>
+            </li>`;
+        }).join('');
+        yarnPicksEl.innerHTML = (rows ? `<ul class="link-list source-card">${rows}</ul>` : '')
+          + '<button type="button" class="btn ghost block display-font" data-action="pick-yarn">+ Choose Yarn</button>';
+        yarnPicksEl.querySelectorAll('[data-unpick-yarn]').forEach((b) => b.addEventListener('click', () => {
+          pickedYarns = pickedYarns.filter((x) => x.yarnId !== b.dataset.unpickYarn);
+          renderYarnPicks();
+        }));
+        yarnPicksEl.querySelector('[data-action="pick-yarn"]').addEventListener('click', pickYarn);
+      };
+
+      async function pickYarn() {
+        const available = Storage.getYarns().filter((y) => !pickedYarns.some((x) => x.yarnId === y.id));
+        if (!available.length) {
+          showBanner(Storage.getYarns().length ? '더 고를 수 있는 실이 없어요.' : '실 보관함에 실이 없어요. Yarn 탭에서 먼저 추가해주세요.', 'warn');
+          return;
+        }
+        const picked = await Modal.pick({
+          title: 'Choose Yarn',
+          placeholder: '이름, 색상, 굵기로 찾기',
+          sections: [{ label: 'Yarn', items: yarnPickItems(available) }],
+        });
+        if (!picked) return;
+        pickedYarns.push({ yarnId: picked });
+        renderYarnPicks();
+      }
+
+      renderYarnPicks();
     }
 
     async function handlePhotoChange(e) {
@@ -2060,7 +2269,8 @@ const App = (() => {
           danger: true,
         });
         if (ok) {
-          if (project.yarns && project.yarns.length) {
+          // 사용량을 기록한 실이 있을 때만 되돌릴지 물음 (기록 전 실은 보유량에서 빠진 게 없음)
+          if ((project.yarns || []).some((l) => Storage.linkUsedAmount(l) > 0)) {
             const restore = await Modal.confirm({
               title: '연결된 실이 있어요',
               message: '차감했던 실 보유량을 되돌릴까요?',
@@ -2105,6 +2315,7 @@ const App = (() => {
           patternId: source && source.kind === 'pattern' ? source.patternId : null,
           ravelryPattern: source && source.kind === 'favorite' ? source.ravelryPattern : null,
         });
+        pickedYarns.forEach((pick) => Storage.linkYarnToProject(created.id, pick.yarnId));
         showBanner('새 작품을 만들었어요.');
         go(`#/project/${created.id}`);
       }
@@ -2142,10 +2353,30 @@ const App = (() => {
   }
 
   // ---------- View: Project Detail ----------
+  // 진행 기간 한 줄: CO 대기 / Cast On · N일째 / Cast On → FO · N일
+  function projectTimeline(project) {
+    const day = 86400000;
+    const days = (from, to) => Math.max(0, Math.round((new Date(to) - new Date(from)) / day));
+    if (project.status === 'onhold') {
+      return project.createdAt ? `${Utils.formatDate(project.createdAt)}에 CO Waiting List에 담았어요` : '';
+    }
+    if (!project.startDate) return '';
+    if (project.status === 'completed' && project.completedDate) {
+      return `Cast On ${Utils.formatDate(project.startDate)} → FO ${Utils.formatDate(project.completedDate)} · ${days(project.startDate, project.completedDate) + 1}일`;
+    }
+    return `Cast On ${Utils.formatDate(project.startDate)} · ${days(project.startDate, Utils.todayStr()) + 1}일째`;
+  }
+
   function renderProjectDetail(id) {
     const project = Storage.getProject(id);
     if (!project) return go('#/');
     setActiveTab('projects');
+    const cover = project.photos && project.photos[project.mainPhotoIndex || 0];
+    const libraryPattern = project.patternId ? Storage.getPattern(project.patternId) : null;
+    const counters = Storage.getCountersByProject(id);
+    const mainCounter = counters.find((c) => c.isDefault) || counters[0];
+    const counterOn = isCounterOn(project);
+    const timeline = projectTimeline(project);
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
@@ -2153,11 +2384,53 @@ const App = (() => {
         <button class="icon-btn" data-action="edit">수정</button>
       </header>
 
+      <div class="detail-hero ${cover ? 'has-photo' : ''}">
+        ${cover ? `<img src="${cover}" alt="">` : `
+          <div class="detail-hero-art">${Icons.stitch('sweater', 0.3)}</div>
+          <label class="btn ghost sm detail-hero-add">
+            <input type="file" accept="image/*" multiple hidden data-photo-input>
+            + 사진 추가
+          </label>`}
+      </div>
+
       <div class="status-row project-status">
         ${statusButton(project, 'onhold', 'CO Waiting List')}
         ${statusButton(project, 'active', 'WIP')}
         ${statusButton(project, 'completed', 'FO')}
       </div>
+      ${timeline ? `<p class="detail-timeline">${timeline}</p>` : ''}
+
+      ${project.status === 'onhold' ? `
+        <div class="cast-on-card">
+          <div class="cast-on-art">${Icons.stitch('yarn', 0.35)}</div>
+          <p class="cast-on-title">아직 코를 잡기 전이에요</p>
+          <p class="card-meta">코를 잡으면 눌러주세요. WIP로 옮기고 시작일을 오늘로 기록해요.</p>
+          <button type="button" class="btn primary block display-btn cast-on-btn" data-action="cast-on">Cast On</button>
+        </div>` : ''}
+
+      ${project.status === 'active' ? (libraryPattern ? `
+        <a class="knit-card" href="#/pattern/${libraryPattern.id}/for/${id}">
+          <div class="knit-card-text">
+            <span class="knit-card-title">Open Pattern</span>
+            <span class="knit-card-sub">${Utils.escapeHtml(libraryPattern.name)}</span>
+          </div>
+          ${counterOn && mainCounter ? `<div class="knit-card-count">${Icons.stitchNumber(mainCounter.value, 0.3)}</div>` : '<span class="knit-card-arrow" aria-hidden="true">→</span>'}
+        </a>` : `
+        <div class="knit-card is-empty-pattern">
+          <div class="knit-card-text">
+            <span class="knit-card-title">Open Pattern</span>
+            <span class="knit-card-sub">도안 파일을 연결하면 도안을 보면서 단수를 셀 수 있어요.</span>
+          </div>
+          <button type="button" class="btn primary sm" data-action="link-pattern">도안 연결</button>
+        </div>`) : ''}
+      ${project.status === 'active' && (libraryPattern || project.ravelryPattern) ? `
+        <div class="knit-card-actions">
+          ${project.ravelryPattern ? `<a class="text-btn primary" href="${project.ravelryPattern.url}" target="_blank" rel="noopener">Ravelry</a>` : ''}
+          ${libraryPattern ? '<button type="button" class="text-btn" data-action="link-pattern">도안 변경</button>' : ''}
+          ${libraryPattern ? '<button type="button" class="text-btn" data-action="unlink-pattern">도안 해제</button>' : ''}
+          ${project.ravelryPattern ? '<button type="button" class="text-btn" data-action="unlink-ravelry">Ravelry 링크 해제</button>' : ''}
+        </div>` : ''}
+
       ${project.status === 'completed' ? `
         <div class="field inline completed-row">
           <span>완성일</span>
@@ -2182,65 +2455,21 @@ const App = (() => {
             <p class="card-meta">완성작을 올린 게시글의 링크를 붙여넣으면 여기에 같이 보여줘요. 게시글 아래 공유(종이비행기) → "링크 복사"로 가져올 수 있어요.</p>`}
         </div>` : ''}
 
-      ${project.status === 'onhold' ? `
-        <div class="cast-on-card">
-          <div class="cast-on-art">${Icons.stitch('yarn', 0.35)}</div>
-          <p class="cast-on-title">아직 코를 잡기 전이에요</p>
-          <p class="card-meta">코를 잡으면 눌러주세요. WIP로 옮기고 시작일을 오늘로 기록해요.</p>
-          <button type="button" class="btn primary block display-btn cast-on-btn" data-action="cast-on">Cast On</button>
-        </div>` : ''}
-
-      <div class="info-block">
-        <h3>작품 정보</h3>
-        <dl>
-          <dt>시작일</dt><dd>${Utils.formatDate(project.startDate) || '-'}</dd>
-          <dt>사용 실</dt><dd>${Utils.escapeHtml(project.yarnText) || '-'}</dd>
-          <dt>바늘 호수</dt><dd>${Utils.escapeHtml(project.needleSize) || '-'}</dd>
-          <dt>메모</dt><dd class="pre">${Utils.escapeHtml(project.memo) || '-'}</dd>
-        </dl>
-        ${project.photos && project.photos.length ? `
-          <div class="photo-grid readonly">
-            ${project.photos.map((src) => `<div class="photo-thumb"><img src="${src}" alt=""></div>`).join('')}
-          </div>` : ''}
-      </div>
-
+      ${project.status === 'active' ? '' : `
       <div class="info-block">
         <div class="section-title-row">
-          <h3>연결한 실</h3>
-          <button type="button" class="btn ghost sm" data-action="link-yarn">+ 실 연결</button>
+          <h3>Pattern</h3>
+          ${libraryPattern ? '' : `<button type="button" class="btn ghost sm" data-action="link-pattern">+ 도안 연결</button>`}
         </div>
-        ${(project.yarns || []).length === 0 ? `<p class="card-meta">연결된 실이 없어요.</p>` : `
+        ${libraryPattern || project.ravelryPattern ? `
           <ul class="link-list">
-            ${(project.yarns || []).map((l) => {
-              const liveYarn = Storage.getYarn(l.yarnId);
-              const label = liveYarn ? liveYarn.name : (l.yarnName || '실');
-              const meta = [liveYarn && liveYarn.color, `${l.amount}볼 사용`, !liveYarn && '삭제된 실'].filter(Boolean).join(' · ');
-              return `
-                <li class="link-item">
-                  <div class="link-item-main">
-                    <span class="link-item-name">${Utils.escapeHtml(label)}</span>
-                    <span class="link-item-meta">${Utils.escapeHtml(meta)}</span>
-                  </div>
-                  <button type="button" class="text-btn" data-unlink-yarn="${l.yarnId}">해제</button>
-                </li>`;
-            }).join('')}
-          </ul>`}
-      </div>
-
-      <div class="info-block">
-        <div class="section-title-row">
-          <h3>연결한 도안</h3>
-          ${project.patternId && Storage.getPattern(project.patternId) ? '' : `<button type="button" class="btn ghost sm" data-action="link-pattern">+ 도안 연결</button>`}
-        </div>
-        ${(project.patternId && Storage.getPattern(project.patternId)) || project.ravelryPattern ? `
-          <ul class="link-list">
-            ${project.patternId && Storage.getPattern(project.patternId) ? `
+            ${libraryPattern ? `
               <li class="link-item">
                 <div class="link-item-main">
-                  <span class="link-item-name">${Utils.escapeHtml(Storage.getPattern(project.patternId).name)}</span>
-                  <span class="link-item-meta">Library</span>
+                  <span class="link-item-name">${Utils.escapeHtml(libraryPattern.name)}</span>
+                  <span class="link-item-meta">${['Library', libraryPattern.needleSize && `바늘 ${Utils.escapeHtml(libraryPattern.needleSize)}`].filter(Boolean).join(' · ')}</span>
                 </div>
-                <a class="text-btn primary" href="#/pattern/${project.patternId}/for/${id}">도안 보기</a>
+                <a class="text-btn primary" href="#/pattern/${libraryPattern.id}/for/${id}">도안 보기</a>
                 <button type="button" class="text-btn" data-action="unlink-pattern">해제</button>
               </li>` : ''}
             ${project.ravelryPattern ? `
@@ -2254,6 +2483,58 @@ const App = (() => {
               </li>` : ''}
           </ul>` : `
           <p class="card-meta">연결된 도안이 없어요.</p>`}
+      </div>`}
+
+      <div class="info-block">
+        <div class="section-title-row">
+          <h3>Yarn</h3>
+          <button type="button" class="btn ghost sm" data-action="link-yarn">+ 실 연결</button>
+        </div>
+        ${(project.yarns || []).length || project.yarnText ? `
+          <ul class="link-list">
+            ${(project.yarns || []).map((l) => {
+              const liveYarn = Storage.getYarn(l.yarnId);
+              const label = liveYarn ? liveYarn.name : (l.yarnName || '실');
+              const usage = l.pending ? '사용량 기록 전' : `${formatYarnAmount(Storage.linkUsedAmount(l), liveYarn ? yarnUnitOf(liveYarn) : (l.unit || 'ball'))} 사용`;
+              const meta = [liveYarn && liveYarn.color, liveYarn && liveYarn.weight, usage, !liveYarn && '삭제된 실'].filter(Boolean).join(' · ');
+              return `
+                <li class="link-item">
+                  <div class="link-item-main">
+                    <span class="link-item-name">${Utils.escapeHtml(label)}</span>
+                    <span class="link-item-meta">${Utils.escapeHtml(meta)}</span>
+                  </div>
+                  ${liveYarn ? `<button type="button" class="text-btn primary" data-record-yarn="${l.yarnId}">${l.pending ? '사용량 기록' : '수정'}</button>` : ''}
+                  <button type="button" class="text-btn" data-unlink-yarn="${l.yarnId}">해제</button>
+                </li>`;
+            }).join('')}
+            ${project.yarnText ? `
+              <li class="link-item">
+                <div class="link-item-main">
+                  <span class="link-item-name">${Utils.escapeHtml(project.yarnText)}</span>
+                  <span class="link-item-meta">직접 적은 사용 실</span>
+                </div>
+              </li>` : ''}
+          </ul>` : `
+          <p class="card-meta">연결된 실이 없어요.</p>`}
+      </div>
+
+      <div class="info-block">
+        <div class="section-title-row"><h3>Details</h3></div>
+        <dl>
+          <dt>바늘 호수</dt><dd>${Utils.escapeHtml(project.needleSize) || '-'}</dd>
+          <dt>메모</dt><dd class="pre">${Utils.escapeHtml(project.memo) || '-'}</dd>
+        </dl>
+      </div>
+
+      <div class="info-block">
+        <div class="section-title-row"><h3>Photos</h3></div>
+        <div class="photo-grid readonly">
+          ${(project.photos || []).map((src) => `<div class="photo-thumb"><img src="${src}" alt=""></div>`).join('')}
+          <label class="photo-add">
+            <input type="file" accept="image/*" multiple hidden data-photo-input>
+            <span>+</span>
+          </label>
+        </div>
       </div>
     `;
 
@@ -2302,16 +2583,44 @@ const App = (() => {
     const castOnBtn = root.querySelector('[data-action="cast-on"]');
     if (castOnBtn) castOnBtn.addEventListener('click', () => castOn(project));
 
+    root.querySelectorAll('[data-photo-input]').forEach((input) => {
+      input.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+        const added = [];
+        for (const file of files) {
+          try { added.push(await resizeImage(file)); } catch (err) { console.error(err); }
+        }
+        if (!added.length) return;
+        Storage.updateProject(id, { photos: [...(Storage.getProject(id).photos || []), ...added] });
+        showBanner(`사진 ${added.length}장을 추가했어요.`);
+        render();
+      });
+    });
+
+    root.querySelectorAll('[data-record-yarn]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (await openYarnUsageModal(id, [btn.dataset.recordYarn])) render();
+      });
+    });
+
     root.querySelectorAll('[data-unlink-yarn]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const yarnId = btn.dataset.unlinkYarn;
-        const restore = await Modal.confirm({
-          title: '연결을 해제할까요?',
-          message: '차감했던 보유량을 실 보관함으로 되돌릴까요?',
-          okLabel: '되돌리기',
-          cancelLabel: '되돌리지 않기',
-        });
-        Storage.unlinkYarnFromProject(id, yarnId, restore);
+        const link = (Storage.getProject(id).yarns || []).find((l) => l.yarnId === yarnId);
+        if (!link || link.pending) {
+          const ok = await Modal.confirm({ title: '실 연결을 해제할까요?', message: '아직 사용량을 기록하지 않아서 실 보유량은 그대로예요.', okLabel: '해제', cancelLabel: '취소' });
+          if (!ok) return;
+          Storage.unlinkYarnFromProject(id, yarnId, false);
+        } else {
+          const restore = await Modal.confirm({
+            title: '연결을 해제할까요?',
+            message: '기록한 사용량만큼 실 보관함 보유량을 되돌릴까요?',
+            okLabel: '되돌리기',
+            cancelLabel: '되돌리지 않기',
+          });
+          Storage.unlinkYarnFromProject(id, yarnId, restore);
+        }
         showBanner('실 연결을 해제했어요.');
         render();
       });
@@ -2323,38 +2632,18 @@ const App = (() => {
         showBanner('연결할 수 있는 실이 없어요.', 'warn');
         return;
       }
-      const res = await Modal.open({
+      const picked = await Modal.pick({
         title: '실 연결',
-        bodyHtml: `
-          <label class="field"><span>실 선택</span>
-            <select data-field="yarnId">
-              ${available.map((y) => `<option value="${y.id}">${Utils.escapeHtml(y.name)} (보유 ${y.amount}볼)</option>`).join('')}
-            </select>
-          </label>
-          <label class="field"><span>사용할 볼 수</span><input type="number" data-field="amount" min="0" step="1" value="1"></label>
-        `,
-        buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '연결', variant: 'primary' }],
+        placeholder: '이름, 색상, 굵기로 찾기',
+        sections: [{ label: 'Yarn', items: yarnPickItems(available) }],
       });
-      if (res.id !== 'ok') return;
-      const yarnId = res.values.yarnId;
-      const amount = Math.max(0, Number(res.values.amount) || 0);
-      const yarn = Storage.getYarn(yarnId);
-      if (yarn && amount > yarn.amount) {
-        const proceed = await Modal.confirm({
-          title: '보유량보다 많아요',
-          message: '보유량보다 많이 사용하면 실 보유량은 0이 돼요. 계속할까요?',
-          okLabel: '계속',
-          cancelLabel: '취소',
-        });
-        if (!proceed) return;
-      }
-      Storage.linkYarnToProject(id, yarnId, amount);
+      if (!picked) return;
+      Storage.linkYarnToProject(id, picked);
       showBanner('실을 연결했어요.');
       render();
     });
 
-    const linkPatternBtn = root.querySelector('[data-action="link-pattern"]');
-    if (linkPatternBtn) {
+    root.querySelectorAll('[data-action="link-pattern"]').forEach((linkPatternBtn) => {
       linkPatternBtn.addEventListener('click', async () => {
         const available = Storage.getPatterns();
         if (!available.length) {
@@ -2367,27 +2656,22 @@ const App = (() => {
           if (goUpload) go('#/pattern/new');
           return;
         }
-        const res = await Modal.open({
+        const picked = await Modal.pick({
           title: '도안 연결',
-          bodyHtml: `
-            <label class="field"><span>도안 선택</span>
-              <select data-field="patternId">
-                ${available.map((p) => `<option value="${p.id}">${Utils.escapeHtml(p.name)}</option>`).join('')}
-              </select>
-            </label>
-          `,
-          buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '연결', variant: 'primary' }],
+          placeholder: '도안 이름으로 찾기',
+          sections: [{ label: 'Library', items: libraryPickItems() }],
         });
-        if (res.id !== 'ok') return;
-        Storage.linkPatternToProject(id, res.values.patternId);
+        if (!picked) return;
+        const patternId = String(picked).replace(/^pattern:/, '');
+        Storage.linkPatternToProject(id, patternId);
         // 작품 바늘 호수가 비어 있으면 도안의 바늘 굵기로 채움 (이미 적은 값은 그대로)
-        const linked = Storage.getPattern(res.values.patternId);
+        const linked = Storage.getPattern(patternId);
         const fillNeedle = linked && linked.needleSize && !String(project.needleSize || '').trim();
         if (fillNeedle) Storage.updateProject(id, { needleSize: linked.needleSize });
         showBanner(fillNeedle ? `도안을 연결하고 바늘 호수를 ${linked.needleSize}로 채웠어요.` : '도안을 연결했어요.');
         render();
       });
-    }
+    });
 
     const unlinkRavelryBtn = root.querySelector('[data-action="unlink-ravelry"]');
     if (unlinkRavelryBtn) {
@@ -2441,6 +2725,13 @@ const App = (() => {
     }
     if (status === 'completed') {
       Storage.updateProject(project.id, { status, completedDate: Utils.todayStr() });
+      const pendingYarnIds = (project.yarns || []).filter((l) => l.pending && Storage.getYarn(l.yarnId)).map((l) => l.yarnId);
+      if (pendingYarnIds.length) {
+        await openYarnUsageModal(project.id, pendingYarnIds, {
+          title: 'FO 축하해요!',
+          intro: '이 작품에 쓴 실 양을 기록하면 실 보관함 보유량이 맞춰져요.',
+        });
+      }
       showBanner('FO로 옮겼어요. Archive에서 볼 수 있어요.');
       go('#/archive');
       return;
