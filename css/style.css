@@ -224,10 +224,6 @@ a.icon-btn { color: var(--text); text-decoration: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .project-card .card-thumb { position: relative; }
-.card-thumb.has-photo::after {
-  content: ""; position: absolute; inset: 4px; border-radius: var(--r-s);
-  border: var(--border-w) dashed rgba(255,252,243,.9); pointer-events: none;
-}
 .thumb-stitch { width: 44px; color: var(--accent); }
 .thumb-stitch.is-pattern { width: 36px; }
 .thumb-stitch.is-yarn { width: 40px; }
@@ -253,15 +249,6 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 }
 .pill-link:active { transform: translate(2px, 2px); box-shadow: none; }
 
-.archive-summary {
-  display: flex; gap: var(--s-3); margin-bottom: var(--s-4);
-}
-.archive-summary > div {
-  flex: 1; background: var(--surface); border: var(--border-w) solid var(--border); border-radius: var(--r-m);
-  padding: var(--s-2); text-align: center;
-}
-.archive-summary strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
-.archive-summary span { font-size: var(--fs-caption); color: var(--text-2); }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
 .grid-2 > * { min-width: 0; }
@@ -322,6 +309,8 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 .chip.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 /* 영어 칩(WIP / UFO / FO, Library / Favorites): 문막 달반체 */
 .chip.display-chip { font-family: var(--font-display); font-weight: 400; font-size: 17px; letter-spacing: .04em; }
+/* 작품 상세 상태 버튼: 글자 길이만큼 폭을 나눠서 "CO Waiting List"도 한 줄로 */
+.project-status .chip.display-chip { flex: 1 1 auto; white-space: nowrap; }
 
 .is-empty { opacity: .55; }
 
@@ -337,7 +326,6 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 .stat span { display: block; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stat label { font-size: var(--fs-caption); color: var(--text-2); }
 
-.manual-record { margin-bottom: var(--s-3); }
 
 .main-counter {
   background: var(--surface); border: var(--outline); border-radius: var(--r-l);
@@ -419,13 +407,6 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 .info-block dd.pre { white-space: pre-wrap; }
 .info-block h3 { font-size: var(--fs-sub); font-weight: 700; color: var(--text-2); margin: 0 0 var(--s-2); }
 
-.session-list { display: flex; flex-direction: column; gap: var(--s-2); }
-.session-item {
-  background: var(--surface); border: var(--border-w) solid var(--border); border-radius: var(--r-m); padding: var(--s-2);
-}
-.session-main { display: flex; justify-content: space-between; font-size: var(--fs-sub); color: var(--text-2); }
-.session-time { font-size: var(--fs-body); font-weight: 700; margin: var(--s-1) 0; font-variant-numeric: tabular-nums; }
-.session-actions { display: flex; gap: var(--s-2); }
 
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0;

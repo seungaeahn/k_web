@@ -40,162 +40,6 @@ const App = (() => {
     }
   });
 
-  // ---------- Session logic ----------
-  function activeSessionFor(projectId) {
-    const active = Storage.getActiveSession();
-    return active && active.projectId === projectId ? active : null;
-  }
-
-  function projectTodayMs(projectId) {
-    const today = Utils.todayStr();
-    let ms = Storage.getSessionsByProject(projectId)
-      .filter((s) => Utils.isSameDay(s.startAt, today))
-      .reduce((sum, s) => sum + (new Date(s.endAt) - new Date(s.startAt)), 0);
-    const active = activeSessionFor(projectId);
-    if (active && Utils.isSameDay(active.startAt, today)) {
-      const end = active.mode === 'auto' ? Date.now() : Date.now();
-      ms += end - new Date(active.startAt).getTime();
-    }
-    return ms;
-  }
-
-  function projectTotalMs(projectId) {
-    let ms = Storage.getSessionsByProject(projectId)
-      .reduce((sum, s) => sum + (new Date(s.endAt) - new Date(s.startAt)), 0);
-    const active = activeSessionFor(projectId);
-    if (active) ms += Date.now() - new Date(active.startAt).getTime();
-    return ms;
-  }
-
-  function finalizeSession(active, endAtOverride) {
-    const endAt = endAtOverride || active.lastTapAt || active.startAt;
-    const durationMs = new Date(endAt) - new Date(active.startAt);
-    Storage.addSession({ projectId: active.projectId, startAt: active.startAt, endAt, mode: active.mode });
-    Storage.setActiveSession(null);
-    Storage.touchProject(active.projectId);
-    return durationMs;
-  }
-
-  function maybeFinalizeAutoSession() {
-    const active = Storage.getActiveSession();
-    if (!active || active.mode !== 'auto') return false;
-    const settings = Storage.getSettings();
-    const idleMs = Date.now() - new Date(active.lastTapAt).getTime();
-    if (idleMs >= settings.autoEndMinutes * 60000) {
-      const durationMs = finalizeSession(active);
-      if (durationMs > 12 * 3600 * 1000) {
-        showBanner('12시간이 넘는 기록이 저장됐어요. 시간 기록에서 확인해주세요.', 'warn', 5000);
-      }
-      return true;
-    }
-    return false;
-  }
-
-  function handleCounterTapSession(projectId) {
-    const active = Storage.getActiveSession();
-    if (active && active.mode === 'manual' && active.projectId === projectId) return;
-    const now = new Date().toISOString();
-    if (active && active.mode === 'auto' && active.projectId === projectId) {
-      active.lastTapAt = now;
-      Storage.setActiveSession(active);
-      return;
-    }
-    if (active && active.mode === 'auto') {
-      finalizeSession(active);
-    }
-    if (!active || active.projectId !== projectId) {
-      Storage.setActiveSession({ projectId, mode: 'auto', startAt: now, lastTapAt: now });
-    }
-  }
-
-  async function startManualSession(projectId) {
-    const active = Storage.getActiveSession();
-    if (active && active.projectId === projectId && active.mode === 'auto') {
-      finalizeSession(active);
-    }
-    Storage.setActiveSession({ projectId, mode: 'manual', startAt: new Date().toISOString() });
-  }
-
-  async function stopManualSession(active, project, presetEndAt) {
-    let endAt = presetEndAt || new Date().toISOString();
-    let durationMs = new Date(endAt) - new Date(active.startAt);
-    while (durationMs > 12 * 3600 * 1000) {
-      const res = await Modal.open({
-        title: '기록 시간이 길어요',
-        bodyHtml: `
-          <p>이 기록이 12시간을 넘었어요. 종료 시각을 확인해주세요.</p>
-          <label class="field">
-            <span>종료 시각</span>
-            <input type="datetime-local" data-field="endAt" value="${Utils.toDateTimeLocal(endAt)}">
-          </label>`,
-        buttons: [
-          { id: 'keep', label: '이대로 저장', variant: 'ghost' },
-          { id: 'fix', label: '시각 수정', variant: 'primary' },
-        ],
-      });
-      if (res.id === 'keep') break;
-      const edited = new Date(res.values.endAt);
-      if (!isNaN(edited.getTime())) {
-        endAt = edited.toISOString();
-        durationMs = new Date(endAt) - new Date(active.startAt);
-      } else {
-        break;
-      }
-    }
-    Storage.addSession({ projectId: active.projectId, startAt: active.startAt, endAt, mode: 'manual' });
-    Storage.setActiveSession(null);
-    Storage.touchProject(active.projectId);
-  }
-
-  async function checkPendingSessionOnBoot() {
-    const active = Storage.getActiveSession();
-    if (!active) return;
-    if (active.mode === 'auto') {
-      maybeFinalizeAutoSession();
-      return;
-    }
-    if (active.mode === 'manual') {
-      const project = Storage.getProject(active.projectId);
-      const name = project ? project.name : '작품';
-      const ok = await Modal.confirm({
-        title: '기록이 진행 중이에요',
-        message: `"${Utils.escapeHtml(name)}"의 수동 기록이 계속되고 있어요. 계속할까요, 종료할까요?`,
-        okLabel: '계속하기',
-        cancelLabel: '종료하기',
-      });
-      if (!ok) {
-        await stopManualSession(active, project);
-        render();
-      }
-    }
-  }
-
-  // ---------- Clock tick ----------
-  function startClock() {
-    setInterval(() => {
-      const finalized = maybeFinalizeAutoSession();
-      if (currentRoute.name === 'project-detail') {
-        updateLiveTimers();
-        if (finalized) render();
-      }
-    }, 1000);
-  }
-
-  function updateLiveTimers() {
-    const projectId = currentRoute.params.id;
-    const todayEl = document.getElementById('stat-today');
-    const totalEl = document.getElementById('stat-total');
-    if (todayEl) todayEl.textContent = Utils.formatDuration(projectTodayMs(projectId));
-    if (totalEl) totalEl.textContent = Utils.formatDuration(projectTotalMs(projectId));
-    const manualTimerEl = document.getElementById('manual-timer');
-    if (manualTimerEl) {
-      const active = activeSessionFor(projectId);
-      if (active && active.mode === 'manual') {
-        manualTimerEl.textContent = Utils.formatDuration(Date.now() - new Date(active.startAt).getTime());
-      }
-    }
-  }
-
   // ---------- Router ----------
   function parseHash() {
     const hash = location.hash.replace(/^#/, '') || '/';
@@ -226,7 +70,6 @@ const App = (() => {
     if (parts[0] === 'project') {
       if (parts[1] === 'new') return { name: 'project-form', params: {} };
       if (parts[2] === 'edit') return { name: 'project-form', params: { id: parts[1] } };
-      if (parts[2] === 'sessions') return { name: 'sessions', params: { id: parts[1] } };
       if (parts[1]) return { name: 'project-detail', params: { id: parts[1] } };
     }
     return { name: 'list', params: {} };
@@ -252,7 +95,6 @@ const App = (() => {
       case 'archive': return renderArchive();
       case 'project-form': return renderProjectForm(route.params.id);
       case 'project-detail': return renderProjectDetail(route.params.id);
-      case 'sessions': return renderSessions(route.params.id);
       case 'yarn-list': return renderYarnList();
       case 'yarn-form': return renderYarnForm(route.params.id);
       case 'tools-home': return renderToolsHome();
@@ -293,7 +135,7 @@ const App = (() => {
       </header>
       ${projects.length === 0
         ? emptyState('아직 작품이 없어요', '새 작품을 추가해서 뜨개를 시작해보세요.', 'sweater')
-        : [['active', 'WIP'], ['onhold', 'UFO']].map(([status, label]) => {
+        : [['active', 'WIP'], ['onhold', 'CO Waiting List']].map(([status, label]) => {
           const group = projects.filter((p) => p.status === status);
           if (!group.length) return '';
           return `
@@ -315,30 +157,19 @@ const App = (() => {
     return `<div class="empty-state">${art ? `<div class="empty-art">${Icons.stitch(art)}</div>` : ''}<p class="empty-title">${title}</p><p class="empty-desc">${desc}</p></div>`;
   }
 
-  // 마지막 작업일: 달력 날짜 기준 "오늘 떴어요" / "N일 전"
-  function lastWorkedLabel(iso) {
-    if (!iso) return '';
-    const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const days = Math.round((startOf(new Date()) - startOf(new Date(iso))) / 86400000);
-    return days <= 0 ? '오늘 떴어요' : `${days}일 전`;
-  }
-
   function projectCard(p) {
     const cover = p.photos && p.photos[p.mainPhotoIndex || 0];
     const counters = Storage.getCountersByProject(p.id);
     const main = counters.find((c) => c.isDefault) || counters[0];
-    const totalMs = projectTotalMs(p.id);
-    // 만들 때 lastWorkedAt = createdAt 이라, 단수 변경·시간 기록이 없으면 아직 안 뜬 작품
-    const hasWorked = p.lastWorkedAt !== p.createdAt || Storage.getSessionsByProject(p.id).length > 0;
-    const meta = [hasWorked && lastWorkedLabel(p.lastWorkedAt), totalMs > 0 && `총 ${Utils.formatDuration(totalMs)}`].filter(Boolean).join(' · ');
+    // CO Waiting List(캐스트온 대기)는 아직 시작 전이라 단수를 보여주지 않음
+    const isCO = p.status === 'onhold';
     return `
-      <div class="card project-card ${p.status === 'onhold' ? 'is-onhold' : ''}" data-project-id="${p.id}">
-        <div class="card-thumb ${cover ? 'has-photo' : ''}">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-stitch">${Icons.stitch('sweater', 0.38)}</div>`}</div>
+      <div class="card project-card ${isCO ? 'is-onhold' : ''}" data-project-id="${p.id}">
+        <div class="card-thumb">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-stitch">${Icons.stitch('sweater', 0.38)}</div>`}</div>
         <div class="card-body">
           <h3 class="project-card-title">${Utils.escapeHtml(p.name)}</h3>
-          ${meta ? `<p class="card-meta">${meta}</p>` : ''}
         </div>
-        ${main ? `
+        ${main && !isCO ? `
           <div class="row-count">
             <div class="row-count-num">${Icons.stitchNumber(main.value, 0.3)}</div>
             <span class="row-count-unit">단</span>
@@ -352,14 +183,10 @@ const App = (() => {
     const projects = Storage.getProjects()
       .filter((p) => p.status === 'completed')
       .sort((a, b) => new Date(b.completedDate || 0) - new Date(a.completedDate || 0));
-    const totalMs = projects.reduce((sum, p) => sum + projectTotalMs(p.id), 0);
 
     root.innerHTML = `
       <header class="page-header"><h1>Archive</h1></header>
-      <div class="archive-summary">
-        <div><strong>${projects.length}</strong><span>FO</span></div>
-        <div><strong>${Utils.formatDuration(totalMs)}</strong><span>총 뜨개 시간</span></div>
-      </div>
+      ${projects.length ? `<h2 class="section-head">FO ${projects.length}</h2>` : ''}
       <div class="grid-2">
         ${projects.length === 0 ? emptyState('완성한 작품이 아직 없어요', '작품을 완성하면 여기에 모여요.') : projects.map(archiveCard).join('')}
       </div>
@@ -1451,7 +1278,6 @@ const App = (() => {
         if (!fresh) return;
         if (delta < 0 && fresh.value <= 0) return;
         changeCounter(fresh, delta, project.id);
-        if (delta > 0) handleCounterTapSession(project.id);
         refreshCount();
         moveBarByRows(delta);
         // 주기 자동 리셋은 900ms 뒤에 일어나서 한 번 더 갱신
@@ -1947,7 +1773,7 @@ const App = (() => {
       root.querySelector('[data-action="delete"]').addEventListener('click', async () => {
         const ok = await Modal.confirm({
           title: '작품을 삭제할까요?',
-          message: '작품과 카운터, 시간 기록, 사진이 모두 삭제돼요.',
+          message: '작품과 카운터, 사진이 모두 삭제돼요.',
           okLabel: '삭제',
           cancelLabel: '취소',
           danger: true,
@@ -2037,9 +1863,6 @@ const App = (() => {
     const counters = Storage.getCountersByProject(id);
     const mainCounter = counters.find((c) => c.isDefault) || counters[0];
     const extraCounters = counters.filter((c) => c.id !== (mainCounter && mainCounter.id));
-    const active = activeSessionFor(id);
-    const manualActive = active && active.mode === 'manual';
-
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
@@ -2047,9 +1870,9 @@ const App = (() => {
         <button class="icon-btn" data-action="edit">수정</button>
       </header>
 
-      <div class="status-row">
+      <div class="status-row project-status">
+        ${statusButton(project, 'onhold', 'CO Waiting List')}
         ${statusButton(project, 'active', 'WIP')}
-        ${statusButton(project, 'onhold', 'UFO')}
         ${statusButton(project, 'completed', 'FO')}
       </div>
       ${project.status === 'completed' ? `
@@ -2057,17 +1880,6 @@ const App = (() => {
           <span>완성일</span>
           <input type="date" id="completed-date" value="${project.completedDate || Utils.todayStr()}">
         </div>` : ''}
-
-      <div class="stat-row">
-        <div class="stat"><span id="stat-today">${Utils.formatDuration(projectTodayMs(id))}</span><label>오늘 뜬 시간</label></div>
-        <div class="stat"><span id="stat-total">${Utils.formatDuration(projectTotalMs(id))}</span><label>총 뜬 시간</label></div>
-      </div>
-
-      <div class="manual-record">
-        <button class="btn ${manualActive ? 'danger' : 'ghost'} block" data-action="toggle-manual">
-          ${manualActive ? `기록 중지 · <span id="manual-timer">${Utils.formatDuration(Date.now() - new Date(active.startAt).getTime())}</span>` : '수동 기록 시작'}
-        </button>
-      </div>
 
       ${mainCounter ? mainCounterBlock(mainCounter) : ''}
 
@@ -2078,8 +1890,6 @@ const App = (() => {
         </div>
         ${extraCounters.map((c) => extraCounterRow(c)).join('')}
       </div>
-
-      <a class="link-row" href="#/project/${id}/sessions">시간 기록 보기 →</a>
 
       <div class="info-block">
         <h3>작품 정보</h3>
@@ -2150,16 +1960,6 @@ const App = (() => {
         Storage.updateProject(id, { completedDate: completedDateInput.value });
       });
     }
-
-    root.querySelector('[data-action="toggle-manual"]').addEventListener('click', async () => {
-      const cur = activeSessionFor(id);
-      if (cur && cur.mode === 'manual') {
-        await stopManualSession(cur, project);
-      } else {
-        await startManualSession(id);
-      }
-      render();
-    });
 
     if (mainCounter) bindCounterEvents(mainCounter, id);
     extraCounters.forEach((c) => bindCounterEvents(c, id));
@@ -2347,9 +2147,6 @@ const App = (() => {
       plusBtn.addEventListener('click', () => {
         if (!canTap(counter.id)) return;
         changeCounter(counter, 1, projectId);
-        if (counter.isDefault || scope.classList.contains('main-counter')) {
-          handleCounterTapSession(projectId);
-        }
         render();
       });
     });
@@ -2452,75 +2249,6 @@ const App = (() => {
     render();
   }
 
-  // ---------- View: Sessions ----------
-  function renderSessions(projectId) {
-    const project = Storage.getProject(projectId);
-    if (!project) return go('#/');
-    const sessions = Storage.getSessionsByProject(projectId);
-
-    root.innerHTML = `
-      <header class="page-header with-back">
-        <button class="icon-btn" data-action="back">←</button>
-        <h1>시간 기록</h1>
-      </header>
-      <div class="session-list">
-        ${sessions.length === 0 ? emptyState('기록이 없어요', '카운터를 탭하거나 수동 기록을 시작해보세요.') : sessions.map(sessionRow).join('')}
-      </div>
-    `;
-
-    root.querySelector('[data-action="back"]').addEventListener('click', () => go(`#/project/${projectId}`));
-    root.querySelectorAll('[data-session-id]').forEach((row) => {
-      const sessionId = row.dataset.sessionId;
-      row.querySelector('[data-action="edit-session"]').addEventListener('click', () => editSession(sessionId, projectId));
-      row.querySelector('[data-action="delete-session"]').addEventListener('click', async () => {
-        const ok = await Modal.confirm({ title: '기록을 삭제할까요?', message: '이 시간 기록을 삭제해요.', okLabel: '삭제', cancelLabel: '취소', danger: true });
-        if (ok) {
-          Storage.deleteSession(sessionId);
-          renderSessions(projectId);
-        }
-      });
-    });
-  }
-
-  function sessionRow(s) {
-    const durationMs = new Date(s.endAt) - new Date(s.startAt);
-    return `
-      <div class="session-item" data-session-id="${s.id}">
-        <div class="session-main">
-          <span class="session-date">${Utils.formatDate(s.startAt)}</span>
-          <span class="session-mode">${s.mode === 'auto' ? '자동' : '수동'}</span>
-        </div>
-        <div class="session-time">${Utils.formatDateTime(s.startAt).split(' ')[1]} - ${Utils.formatDateTime(s.endAt).split(' ')[1]} · ${Utils.formatDuration(durationMs)}</div>
-        <div class="session-actions">
-          <button class="btn ghost sm" data-action="edit-session">수정</button>
-          <button class="btn ghost sm" data-action="delete-session">삭제</button>
-        </div>
-      </div>`;
-  }
-
-  async function editSession(sessionId, projectId) {
-    const sessions = Storage.getSessions();
-    const s = sessions.find((x) => x.id === sessionId);
-    if (!s) return;
-    const res = await Modal.open({
-      title: '기록 수정',
-      bodyHtml: `
-        <label class="field"><span>시작 시각</span><input type="datetime-local" data-field="startAt" value="${Utils.toDateTimeLocal(s.startAt)}"></label>
-        <label class="field"><span>종료 시각</span><input type="datetime-local" data-field="endAt" value="${Utils.toDateTimeLocal(s.endAt)}"></label>
-      `,
-      buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '저장', variant: 'primary' }],
-    });
-    if (res.id !== 'ok') return;
-    const startAt = new Date(res.values.startAt).toISOString();
-    const endAt = new Date(res.values.endAt).toISOString();
-    if (new Date(endAt) <= new Date(startAt)) {
-      showBanner('종료 시각은 시작 시각보다 늦어야 해요.', 'warn');
-      return;
-    }
-    Storage.updateSession(sessionId, { startAt, endAt });
-    renderSessions(projectId);
-  }
-
   // ---------- Backup reminder ----------
   function checkBackupReminder() {
     const settings = Storage.getSettings();
@@ -2541,16 +2269,9 @@ const App = (() => {
   // ---------- Init ----------
   function init() {
     window.addEventListener('hashchange', render);
-    window.addEventListener('beforeunload', () => {
-      const active = Storage.getActiveSession();
-      if (active && active.mode === 'auto') {
-        active.lastTapAt = active.lastTapAt || active.startAt;
-        Storage.setActiveSession(active);
-      }
-    });
+    // 시간 기록 기능을 없애면서, 예전에 진행 중이던 기록 상태가 남아 있으면 비움
+    if (Storage.getActiveSession()) Storage.setActiveSession(null);
     render();
-    startClock();
-    checkPendingSessionOnBoot();
     checkBackupReminder();
     registerServiceWorker();
   }
