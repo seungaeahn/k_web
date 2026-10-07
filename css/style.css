@@ -134,6 +134,7 @@ body[data-view="pattern-viewer"] #app {
   font-family: var(--font);
 }
 .icon-btn.sm { font-size: 14px; padding: var(--s-1) var(--s-2); }
+a.icon-btn { color: var(--text); text-decoration: none; }
 .icon-btn:active { background: var(--surface-2); }
 
 .btn {
