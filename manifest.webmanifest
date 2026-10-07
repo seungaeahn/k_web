@@ -1,7 +1,7 @@
 {
   "name": "뜨개 다이어리",
   "short_name": "뜨개 다이어리",
-  "description": "뜨개 작품, 단수, 시간을 기록하는 개인용 앱",
+  "description": "뜨개 작품, 실, 도안, 단수를 기록하는 개인용 앱",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

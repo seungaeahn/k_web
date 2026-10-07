@@ -201,7 +201,7 @@ const App = (() => {
     root.innerHTML = `
       <header class="page-header"><h1>Archive</h1></header>
       ${projects.length ? `<h2 class="section-head">FO ${projects.length}</h2>` : ''}
-      <div class="grid-2">
+      <div class="grid-2 archive-grid">
         ${projects.length === 0 ? emptyState('완성한 작품이 아직 없어요', '작품을 완성하면 여기에 모여요.') : projects.map(archiveCard).join('')}
       </div>
     `;
@@ -383,7 +383,7 @@ const App = (() => {
             <input type="number" min="0" step="0.5" inputmode="decimal" data-field="y${r.i}" placeholder="쓴 볼 수" value="${r.prevUsed != null ? r.prevUsed : ''}">
           </label>`)).join('')}
         <p class="card-meta">g 단위 실(콘사)은 저울에 올린 남은 무게를 적으면 쓴 양을 계산해요. 비워두면 기록하지 않아요.</p>`,
-      buttons: [{ id: 'cancel', label: '나중에', variant: 'ghost' }, { id: 'ok', label: '기록', variant: 'primary' }],
+      buttons: [{ id: 'cancel', label: 'Later', variant: 'ghost' }, { id: 'ok', label: 'Save', variant: 'primary' }],
     });
     if (res.id !== 'ok') return false;
 
@@ -460,7 +460,7 @@ const App = (() => {
           ${Ravelry.isConfigured() ? `
             <div class="input-with-action">
               <input type="text" name="name" value="${yarn ? Utils.escapeHtml(yarn.name) : ''}" placeholder="예: 메리노 DK" enterkeyhint="search">
-              <button type="button" class="btn ghost sm" data-action="ravelry-search">Ravelry 검색</button>
+              <button type="button" class="btn ghost sm" data-action="ravelry-search">Search Ravelry</button>
             </div>
           ` : `<input type="text" name="name" value="${yarn ? Utils.escapeHtml(yarn.name) : ''}" placeholder="예: 메리노 DK">`}
           <p class="field-error" id="name-error" hidden>이름을 입력해주세요.</p>
@@ -518,8 +518,8 @@ const App = (() => {
           </div>` : ''}
         ${editing ? `<a class="link-row" href="#/pattern/recommend/${id}">이 실로 뜰 도안 찾기 →</a>` : ''}
         <div class="form-actions">
-          <button type="submit" class="btn primary block">저장</button>
-          ${editing ? `<button type="button" class="btn danger block" data-action="delete">실 삭제</button>` : ''}
+          <button type="submit" class="btn primary block">Save</button>
+          ${editing ? `<button type="button" class="btn danger block" data-action="delete">Delete Yarn</button>` : ''}
         </div>
       </form>
     `;
@@ -557,7 +557,7 @@ const App = (() => {
               <strong>${Utils.escapeHtml(r.name)}</strong>
               <span class="card-sub">${Utils.escapeHtml(r.company)}</span>
             </div>
-            <div class="counter-row-controls"><button type="button" class="icon-btn sm">불러오기</button></div>
+            <div class="counter-row-controls"><button type="button" class="icon-btn sm display-text">Import</button></div>
           </div>`).join('');
         resultsEl.querySelectorAll('[data-ravelry-yarn]').forEach((row) => {
           row.addEventListener('click', async () => {
@@ -609,14 +609,14 @@ const App = (() => {
         const ok = await Modal.confirm(linked.length ? {
           title: '연결된 작품이 있어요',
           message: `${linked.map((p) => p.name).join(', ')}에 연결돼 있어요. 삭제해도 작품에는 실 이름이 남아요.`,
-          okLabel: '삭제',
-          cancelLabel: '취소',
+          okLabel: 'Delete',
+          cancelLabel: 'Cancel',
           danger: true,
         } : {
           title: '실을 삭제할까요?',
           message: '삭제한 실 정보는 되돌릴 수 없어요.',
-          okLabel: '삭제',
-          cancelLabel: '취소',
+          okLabel: 'Delete',
+          cancelLabel: 'Cancel',
           danger: true,
         });
         if (!ok) return;
@@ -692,38 +692,47 @@ const App = (() => {
         <button class="icon-btn" data-action="back">←</button>
         <h1 class="display-title">Gauge Calculator</h1>
       </header>
-      <form id="gauge-form" class="form">
-        <div class="grid-2">
-          <label class="field"><span>샘플 가로(cm)</span><input type="number" name="sampleWidth" min="0" step="0.1"><p class="field-error" data-error="sampleWidth" hidden>0보다 큰 값을 입력해주세요.</p></label>
-          <label class="field"><span>샘플 세로(cm)</span><input type="number" name="sampleHeight" min="0" step="0.1"><p class="field-error" data-error="sampleHeight" hidden>0보다 큰 값을 입력해주세요.</p></label>
+      <form id="gauge-form" class="gauge-form">
+        <div class="info-block gauge-card">
+          <h3>내 스와치</h3>
+          <p class="card-meta">뜬 게이지 샘플을 재서 적어주세요.</p>
+          <div class="grid-2">
+            <label class="field"><span>가로 (cm)</span><input type="number" name="sampleWidth" min="0" step="0.1" inputmode="decimal" placeholder="10"><p class="field-error" data-error="sampleWidth" hidden>0보다 큰 값을 입력해주세요.</p></label>
+            <label class="field"><span>세로 (cm)</span><input type="number" name="sampleHeight" min="0" step="0.1" inputmode="decimal" placeholder="10"><p class="field-error" data-error="sampleHeight" hidden>0보다 큰 값을 입력해주세요.</p></label>
+            <label class="field"><span>코 수</span><input type="number" name="sampleStitches" min="0" step="1" inputmode="numeric" placeholder="22"><p class="field-error" data-error="sampleStitches" hidden>0보다 큰 값을 입력해주세요.</p></label>
+            <label class="field"><span>단 수</span><input type="number" name="sampleRows" min="0" step="1" inputmode="numeric" placeholder="30"><p class="field-error" data-error="sampleRows" hidden>0보다 큰 값을 입력해주세요.</p></label>
+          </div>
         </div>
-        <div class="grid-2">
-          <label class="field"><span>샘플 코 수</span><input type="number" name="sampleStitches" min="0" step="1"><p class="field-error" data-error="sampleStitches" hidden>0보다 큰 값을 입력해주세요.</p></label>
-          <label class="field"><span>샘플 단 수</span><input type="number" name="sampleRows" min="0" step="1"><p class="field-error" data-error="sampleRows" hidden>0보다 큰 값을 입력해주세요.</p></label>
-        </div>
-        <div class="grid-2">
-          <label class="field"><span>목표 가로(cm)</span><input type="number" name="targetWidth" min="0" step="0.1"><p class="field-error" data-error="targetWidth" hidden>0보다 큰 값을 입력해주세요.</p></label>
-          <label class="field"><span>목표 세로(cm)</span><input type="number" name="targetHeight" min="0" step="0.1"><p class="field-error" data-error="targetHeight" hidden>0보다 큰 값을 입력해주세요.</p></label>
+        <div class="info-block gauge-card">
+          <h3>만들 크기</h3>
+          <div class="grid-2">
+            <label class="field"><span>가로 (cm)</span><input type="number" name="targetWidth" min="0" step="0.1" inputmode="decimal"><p class="field-error" data-error="targetWidth" hidden>0보다 큰 값을 입력해주세요.</p></label>
+            <label class="field"><span>세로 (cm)</span><input type="number" name="targetHeight" min="0" step="0.1" inputmode="decimal"><p class="field-error" data-error="targetHeight" hidden>0보다 큰 값을 입력해주세요.</p></label>
+          </div>
         </div>
       </form>
-      <div class="stat-row" id="gauge-result" hidden>
-        <div class="stat"><span id="result-stitches">-</span><label>필요한 코 수</label></div>
-        <div class="stat"><span id="result-rows">-</span><label>필요한 단 수</label></div>
+      <div class="gauge-result">
+        <div class="gauge-result-nums">
+          <div class="gauge-result-item"><strong id="result-stitches">-</strong><span>코</span></div>
+          <div class="gauge-result-x" aria-hidden="true">×</div>
+          <div class="gauge-result-item"><strong id="result-rows">-</strong><span>단</span></div>
+        </div>
+        <p class="card-meta" id="gauge-result-note">칸을 모두 채우면 필요한 코 수와 단 수를 계산해요.</p>
       </div>
       ${projects.length ? `
-        <div class="info-block" id="gauge-save" hidden>
+        <div class="info-block gauge-card" id="gauge-save" hidden>
           <h3>결과를 작품 메모에 저장</h3>
           <label class="field">
             <select id="gauge-project-select">${projects.map((p) => `<option value="${p.id}">${Utils.escapeHtml(p.name)}</option>`).join('')}</select>
           </label>
-          <button type="button" class="btn ghost sm" data-action="save-memo">메모에 저장</button>
+          <button type="button" class="btn ghost block" data-action="save-memo">Save to Notes</button>
         </div>` : ''}
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
 
     const form = root.querySelector('#gauge-form');
-    const resultBox = root.querySelector('#gauge-result');
+    const resultBox = root.querySelector('.gauge-result');
     const saveBox = root.querySelector('#gauge-save');
     let lastResult = null;
 
@@ -751,7 +760,12 @@ const App = (() => {
       });
 
       if (hasEmpty || hasInvalid) {
-        resultBox.hidden = true;
+        root.querySelector('#result-stitches').textContent = '-';
+        root.querySelector('#result-rows').textContent = '-';
+        root.querySelector('#gauge-result-note').textContent = hasInvalid
+          ? '0보다 큰 값을 넣어주세요.'
+          : '칸을 모두 채우면 필요한 코 수와 단 수를 계산해요.';
+        resultBox.classList.remove('is-ready');
         if (saveBox) saveBox.hidden = true;
         lastResult = null;
         return;
@@ -764,9 +778,15 @@ const App = (() => {
         targetWidth: values.targetWidth, targetHeight: values.targetHeight,
       };
 
-      root.querySelector('#result-stitches').textContent = `${lastResult.stitches}코 (${neededStitches.toFixed(1)})`;
-      root.querySelector('#result-rows').textContent = `${lastResult.rows}단 (${neededRows.toFixed(1)})`;
-      resultBox.hidden = false;
+      root.querySelector('#result-stitches').textContent = lastResult.stitches;
+      root.querySelector('#result-rows').textContent = lastResult.rows;
+      const per10 = (n, size) => Math.round((n / size) * 10 * 10) / 10;
+      root.querySelector('#gauge-result-note').textContent =
+        `10cm당 ${per10(values.sampleStitches, values.sampleWidth)}코 × ${per10(values.sampleRows, values.sampleHeight)}단`
+        // 반올림한 값과 다를 때만 계산값을 같이 보여줌
+        + (Math.abs(neededStitches - lastResult.stitches) > 0.05 || Math.abs(neededRows - lastResult.rows) > 0.05
+          ? ` · 계산값 ${neededStitches.toFixed(1)}코, ${neededRows.toFixed(1)}단` : '');
+      resultBox.classList.add('is-ready');
       if (saveBox) saveBox.hidden = false;
     }
 
@@ -794,7 +814,7 @@ const App = (() => {
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
         <h1 class="display-title">Abbreviations</h1>
-        <button class="btn primary sm" data-action="new-abbr">+ 추가</button>
+        <button class="btn primary sm" data-action="new-abbr">+ Add</button>
       </header>
       <label class="field search-field"><input type="text" id="abbr-search" placeholder="약어, 설명 검색"></label>
       <div class="list" id="abbr-list-body"></div>
@@ -827,7 +847,7 @@ const App = (() => {
           <label class="field"><span>약어</span><input type="text" data-field="term" value="${existing ? Utils.escapeHtml(existing.term) : ''}" placeholder="예: k2tog"></label>
           <label class="field"><span>설명</span><input type="text" data-field="description" value="${existing ? Utils.escapeHtml(existing.description) : ''}" placeholder="예: 겉뜨기 2코 모아뜨기"></label>
         `,
-        buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '저장', variant: 'primary' }],
+        buttons: [{ id: 'cancel', label: 'Cancel', variant: 'ghost' }, { id: 'ok', label: 'Save', variant: 'primary' }],
       });
       if (res.id !== 'ok') return;
       const term = (res.values.term || '').trim();
@@ -855,8 +875,8 @@ const App = (() => {
       const ok = await Modal.confirm({
         title: '약어를 삭제할까요?',
         message: '기본 약어라면 나중에 "기본 약어 복원"으로 되살릴 수 있어요.',
-        okLabel: '삭제',
-        cancelLabel: '취소',
+        okLabel: 'Delete',
+        cancelLabel: 'Cancel',
         danger: true,
       });
       if (!ok) return;
@@ -886,8 +906,8 @@ const App = (() => {
           <span class="card-sub">${Utils.escapeHtml(a.description)}</span>
         </div>
         <div class="counter-row-controls">
-          <button type="button" class="icon-btn sm" data-edit-abbr="${a.id}">수정</button>
-          <button type="button" class="icon-btn sm" data-delete-abbr="${a.id}">삭제</button>
+          <button type="button" class="icon-btn sm display-text" data-edit-abbr="${a.id}">Edit</button>
+          <button type="button" class="icon-btn sm display-text" data-delete-abbr="${a.id}">Delete</button>
         </div>
       </div>`;
   }
@@ -917,14 +937,14 @@ const App = (() => {
           <span>도안 파일(PDF·이미지) 포함</span>
         </label>
         <p class="card-meta">사진과 도안 파일을 넣으면 백업 파일이 커질 수 있어요. Ravelry API 키는 백업에 들어가지 않아요.</p>
-        <button type="button" class="btn primary block" data-action="export">데이터 내보내기</button>
+        <button type="button" class="btn primary block" data-action="export">Export Data</button>
       </div>
       <div class="info-block backup-card">
         <h3>가져오기</h3>
         <p class="card-meta">백업 파일로 데이터를 되살려요. 지금 있는 데이터는 모두 파일 내용으로 바뀌어요.</p>
         <label class="btn ghost block">
           <input type="file" id="import-input" accept="application/json,.json" hidden>
-          백업 파일 선택
+          Choose Backup File
         </label>
       </div>
     `;
@@ -979,8 +999,8 @@ const App = (() => {
       const proceed = await Modal.confirm({
         title: '데이터를 덮어쓸까요?',
         message: '가져오기를 하면 지금 있는 데이터가 모두 사라지고 파일 내용으로 바뀌어요. 걱정되면 취소하고 먼저 내보내기를 해두세요.',
-        okLabel: '가져오기',
-        cancelLabel: '취소',
+        okLabel: 'Import',
+        cancelLabel: 'Cancel',
         danger: true,
       });
       if (!proceed) {
@@ -1032,8 +1052,8 @@ const App = (() => {
           <input type="password" name="ravelrySecret" value="${Utils.escapeHtml(settings.ravelrySecret || '')}" autocomplete="off">
         </label>
         <div class="form-actions">
-          <button type="submit" class="btn primary block">저장</button>
-          <button type="button" class="btn ghost block" data-action="test-connection">연결 테스트</button>
+          <button type="submit" class="btn primary block">Save</button>
+          <button type="button" class="btn ghost block" data-action="test-connection">Test Connection</button>
         </div>
       </form>
       <p class="card-meta">이 앱은 Ravelry에서 만들거나 제휴·보증한 앱이 아니에요. 키와 시크릿은 이 기기에만 저장되고 Ravelry API 호출에만 사용돼요.</p>
@@ -1151,7 +1171,7 @@ const App = (() => {
         <div class="info-block">
           <h3>Ravelry 연동이 필요해요</h3>
           <p class="card-meta">Ravelry API 키를 설정하면 도안을 검색하고 찜할 수 있어요.</p>
-          <a class="btn primary sm" href="#/tools/ravelry">설정하러 가기</a>
+          <a class="btn primary sm" href="#/tools/ravelry">Go to Settings</a>
         </div>`;
       return;
     }
@@ -1161,7 +1181,7 @@ const App = (() => {
       <label class="field search-field">
         <div class="input-with-action">
           <input type="search" id="pattern-query" value="${Utils.escapeHtml(st.query)}" placeholder="도안 이름, 디자이너 (예: cable hat)" enterkeyhint="search">
-          <button type="button" class="btn ghost sm" data-action="search">검색</button>
+          <button type="button" class="btn ghost sm" data-action="search">Search</button>
         </div>
       </label>
       <div class="status-row" id="craft-filter">
@@ -1216,7 +1236,7 @@ const App = (() => {
         return;
       }
       resultsEl.innerHTML = state.items.map(patternResultCard).join('')
-        + (state.hasMore ? '<button type="button" class="btn ghost block" data-action="load-more">더 보기</button>' : '');
+        + (state.hasMore ? '<button type="button" class="btn ghost block" data-action="load-more">Load More</button>' : '');
 
       resultsEl.querySelectorAll('[data-favorite]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
@@ -1399,8 +1419,8 @@ const App = (() => {
           <p class="field-error" id="file-error" hidden></p>
         </div>
         <div class="form-actions">
-          <button type="submit" class="btn primary block" id="pattern-submit" ${editing ? '' : 'disabled'}>저장</button>
-          ${editing ? '<button type="button" class="btn danger block" data-action="delete-pattern">도안 삭제</button>' : ''}
+          <button type="submit" class="btn primary block" id="pattern-submit" ${editing ? '' : 'disabled'}>Save</button>
+          ${editing ? '<button type="button" class="btn danger block" data-action="delete-pattern">Delete Pattern</button>' : ''}
         </div>
       </form>
     `;
@@ -1558,14 +1578,14 @@ const App = (() => {
         const ok = await Modal.confirm(linked.length ? {
           title: '연결된 작품이 있어요',
           message: `${linked.map((proj) => proj.name).join(', ')}에서 이 도안을 보고 있어요. 삭제하면 연결도 함께 풀려요.`,
-          okLabel: '삭제',
-          cancelLabel: '취소',
+          okLabel: 'Delete',
+          cancelLabel: 'Cancel',
           danger: true,
         } : {
           title: '도안을 삭제할까요?',
           message: '삭제한 도안 파일은 되돌릴 수 없어요.',
-          okLabel: '삭제',
-          cancelLabel: '취소',
+          okLabel: 'Delete',
+          cancelLabel: 'Cancel',
           danger: true,
         });
         if (!ok) return;
@@ -1603,7 +1623,7 @@ const App = (() => {
         <button class="icon-btn" data-action="back">←</button>
         <h1>${Utils.escapeHtml(pattern.name)}</h1>
         ${project ? '' : `<a class="btn primary sm display-btn" href="#/project/new/pattern/${patternId}">Start Project</a>`}
-        <a class="icon-btn" href="#/pattern/${patternId}/edit">수정</a>
+        <a class="icon-btn display-text" href="#/pattern/${patternId}/edit">Edit</a>
       </header>
       <div class="pattern-toolbar">
         <div class="pattern-toolbar-group">
@@ -1651,7 +1671,7 @@ const App = (() => {
     function renderCounterDock() {
       if (!counterSlot) return;
       if (!isCounterOn(Storage.getProject(project.id))) {
-        counterSlot.innerHTML = '<button type="button" class="btn ghost block viewer-add-counter" data-action="enable-counter">+ 단수 카운터</button>';
+        counterSlot.innerHTML = '<button type="button" class="btn ghost block viewer-add-counter" data-action="enable-counter">+ Row Counter</button>';
         counterSlot.querySelector('[data-action="enable-counter"]').addEventListener('click', () => {
           Storage.updateProject(project.id, { counterEnabled: true });
           renderCounterDock();
@@ -1947,7 +1967,7 @@ const App = (() => {
         </header>
         ${emptyState('굵기와 볼당 길이가 필요해요', '실 정보에 굵기와 볼당 길이를 먼저 입력해주세요.')}
         <div class="form-actions">
-          <a class="btn primary block" href="#/yarn/${yarnId}">실 정보 입력하러 가기</a>
+          <a class="btn primary block" href="#/yarn/${yarnId}">Edit Yarn Info</a>
         </div>
       `;
       root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
@@ -1982,7 +2002,7 @@ const App = (() => {
       </div>
       <label class="field checkbox"><input type="checkbox" id="free-only"><span>무료 도안만 보기</span></label>
       <div class="form-actions">
-        <button type="button" class="btn primary block" data-action="search">도안 찾기</button>
+        <button type="button" class="btn primary block" data-action="search">Find Patterns</button>
       </div>
       <div class="list results-list" id="pattern-results"></div>
     `;
@@ -2122,8 +2142,8 @@ const App = (() => {
           </div>
         </div>
         <div class="form-actions">
-          <button type="submit" class="btn primary block">저장</button>
-          ${editing ? `<button type="button" class="btn danger block" data-action="delete">작품 삭제</button>` : ''}
+          <button type="submit" class="btn primary block">Save</button>
+          ${editing ? `<button type="button" class="btn danger block" data-action="delete">Delete Project</button>` : ''}
         </div>
       </form>
     `;
@@ -2156,8 +2176,8 @@ const App = (() => {
                 <span class="link-item-name">${Utils.escapeHtml(source.name)}</span>
                 <span class="link-item-meta">${source.kind === 'pattern' ? 'Library' : 'Favorites · Ravelry'}${source.needleSize ? ` · 바늘 ${Utils.escapeHtml(source.needleSize)}` : ''}</span>
               </div>
-              <button type="button" class="text-btn primary" data-action="pick-pattern">변경</button>
-              <button type="button" class="text-btn" data-action="clear-pattern">빼기</button>
+              <button type="button" class="text-btn primary" data-action="pick-pattern">Change</button>
+              <button type="button" class="text-btn" data-action="clear-pattern">Remove</button>
             </li>
           </ul>`
           : '<button type="button" class="btn ghost block display-font" data-action="pick-pattern">Choose Pattern</button>';
@@ -2215,7 +2235,7 @@ const App = (() => {
                 <span class="link-item-name">${Utils.escapeHtml(y.name)}</span>
                 <span class="link-item-meta">${Utils.escapeHtml(meta)}</span>
               </div>
-              <button type="button" class="text-btn" data-unpick-yarn="${pick.yarnId}">빼기</button>
+              <button type="button" class="text-btn" data-unpick-yarn="${pick.yarnId}">Remove</button>
             </li>`;
         }).join('');
         yarnPicksEl.innerHTML = (rows ? `<ul class="link-list source-card">${rows}</ul>` : '')
@@ -2279,8 +2299,8 @@ const App = (() => {
         const ok = await Modal.confirm({
           title: '작품을 삭제할까요?',
           message: '작품과 카운터, 사진이 모두 삭제돼요.',
-          okLabel: '삭제',
-          cancelLabel: '취소',
+          okLabel: 'Delete',
+          cancelLabel: 'Cancel',
           danger: true,
         });
         if (ok) {
@@ -2289,8 +2309,8 @@ const App = (() => {
             const restore = await Modal.confirm({
               title: '연결된 실이 있어요',
               message: '차감했던 실 보유량을 되돌릴까요?',
-              okLabel: '되돌리기',
-              cancelLabel: '되돌리지 않기',
+              okLabel: 'Restore',
+              cancelLabel: 'Keep',
             });
             if (restore) Storage.restoreYarnAmounts(project);
           }
@@ -2396,7 +2416,7 @@ const App = (() => {
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
         <h1>${Utils.escapeHtml(project.name)}</h1>
-        <button class="icon-btn" data-action="edit">수정</button>
+        <button class="icon-btn display-text" data-action="edit">Edit</button>
       </header>
 
       <div class="detail-hero ${cover ? 'has-photo' : ''}">
@@ -2404,7 +2424,7 @@ const App = (() => {
           <div class="detail-hero-art">${Icons.stitch('sweater', 0.3)}</div>
           <label class="btn ghost sm detail-hero-add">
             <input type="file" accept="image/*" multiple hidden data-photo-input>
-            + 사진 추가
+            + Add Photo
           </label>`}
       </div>
 
@@ -2436,14 +2456,14 @@ const App = (() => {
             <span class="knit-card-title">Open Pattern</span>
             <span class="knit-card-sub">도안 파일을 연결하면 도안을 보면서 단수를 셀 수 있어요.</span>
           </div>
-          <button type="button" class="btn primary sm" data-action="link-pattern">도안 연결</button>
+          <button type="button" class="btn primary sm" data-action="link-pattern">Link Pattern</button>
         </div>`) : ''}
       ${project.status === 'active' && (libraryPattern || project.ravelryPattern) ? `
         <div class="knit-card-actions">
           ${project.ravelryPattern ? `<a class="text-btn primary" href="${project.ravelryPattern.url}" target="_blank" rel="noopener">Ravelry</a>` : ''}
-          ${libraryPattern ? '<button type="button" class="text-btn" data-action="link-pattern">도안 변경</button>' : ''}
-          ${libraryPattern ? '<button type="button" class="text-btn" data-action="unlink-pattern">도안 해제</button>' : ''}
-          ${project.ravelryPattern ? '<button type="button" class="text-btn" data-action="unlink-ravelry">Ravelry 링크 해제</button>' : ''}
+          ${libraryPattern ? '<button type="button" class="text-btn" data-action="link-pattern">Change Pattern</button>' : ''}
+          ${libraryPattern ? '<button type="button" class="text-btn" data-action="unlink-pattern">Unlink Pattern</button>' : ''}
+          ${project.ravelryPattern ? '<button type="button" class="text-btn" data-action="unlink-ravelry">Unlink Ravelry</button>' : ''}
         </div>` : ''}
 
       ${project.status === 'completed' ? `
@@ -2454,17 +2474,17 @@ const App = (() => {
         <div class="info-block ig-block">
           <div class="section-title-row">
             <h3>Instagram</h3>
-            ${project.instagramUrl ? '<button type="button" class="text-btn" data-action="ig-remove">해제</button>' : ''}
+            ${project.instagramUrl ? '<button type="button" class="text-btn" data-action="ig-remove">Unlink</button>' : ''}
           </div>
           ${parseInstagramUrl(project.instagramUrl) ? `
             <div class="ig-embed">
               <iframe src="${parseInstagramUrl(project.instagramUrl).embed}" title="Instagram 게시글" loading="lazy" scrolling="no" allowtransparency="true"></iframe>
             </div>
-            <a class="text-btn primary ig-open" href="${parseInstagramUrl(project.instagramUrl).url}" target="_blank" rel="noopener">Instagram에서 보기</a>` : `
+            <a class="text-btn primary ig-open" href="${parseInstagramUrl(project.instagramUrl).url}" target="_blank" rel="noopener">Open in Instagram</a>` : `
             <label class="field">
               <div class="input-with-action">
                 <input type="url" id="ig-url" placeholder="https://www.instagram.com/p/..." enterkeyhint="done">
-                <button type="button" class="btn ghost sm" data-action="ig-save">저장</button>
+                <button type="button" class="btn ghost sm" data-action="ig-save">Save</button>
               </div>
             </label>
             <p class="card-meta">완성작을 올린 게시글의 링크를 붙여넣으면 여기에 같이 보여줘요. 게시글 아래 공유(종이비행기) → "링크 복사"로 가져올 수 있어요.</p>`}
@@ -2474,7 +2494,7 @@ const App = (() => {
       <div class="info-block">
         <div class="section-title-row">
           <h3>Pattern</h3>
-          ${libraryPattern ? '' : `<button type="button" class="btn ghost sm" data-action="link-pattern">+ 도안 연결</button>`}
+          ${libraryPattern ? '' : `<button type="button" class="btn ghost sm" data-action="link-pattern">+ Link Pattern</button>`}
         </div>
         ${libraryPattern || project.ravelryPattern ? `
           <ul class="link-list">
@@ -2484,8 +2504,8 @@ const App = (() => {
                   <span class="link-item-name">${Utils.escapeHtml(libraryPattern.name)}</span>
                   <span class="link-item-meta">${['Library', libraryPattern.needleSize && `바늘 ${Utils.escapeHtml(libraryPattern.needleSize)}`].filter(Boolean).join(' · ')}</span>
                 </div>
-                <a class="text-btn primary" href="#/pattern/${libraryPattern.id}/for/${id}">도안 보기</a>
-                <button type="button" class="text-btn" data-action="unlink-pattern">해제</button>
+                <a class="text-btn primary" href="#/pattern/${libraryPattern.id}/for/${id}">View Pattern</a>
+                <button type="button" class="text-btn" data-action="unlink-pattern">Unlink</button>
               </li>` : ''}
             ${project.ravelryPattern ? `
               <li class="link-item">
@@ -2494,7 +2514,7 @@ const App = (() => {
                   <span class="link-item-meta">Ravelry 링크</span>
                 </div>
                 <a class="text-btn primary" href="${project.ravelryPattern.url}" target="_blank" rel="noopener">Ravelry</a>
-                <button type="button" class="text-btn" data-action="unlink-ravelry">해제</button>
+                <button type="button" class="text-btn" data-action="unlink-ravelry">Unlink</button>
               </li>` : ''}
           </ul>` : `
           <p class="card-meta">연결된 도안이 없어요.</p>`}
@@ -2503,7 +2523,7 @@ const App = (() => {
       <div class="info-block">
         <div class="section-title-row">
           <h3>Yarn</h3>
-          <button type="button" class="btn ghost sm" data-action="link-yarn">+ 실 연결</button>
+          <button type="button" class="btn ghost sm" data-action="link-yarn">+ Link Yarn</button>
         </div>
         ${(project.yarns || []).length || project.yarnText ? `
           <ul class="link-list">
@@ -2518,8 +2538,8 @@ const App = (() => {
                     <span class="link-item-name">${Utils.escapeHtml(label)}</span>
                     <span class="link-item-meta">${Utils.escapeHtml(meta)}</span>
                   </div>
-                  ${liveYarn ? `<button type="button" class="text-btn primary" data-record-yarn="${l.yarnId}">${l.pending ? '사용량 기록' : '수정'}</button>` : ''}
-                  <button type="button" class="text-btn" data-unlink-yarn="${l.yarnId}">해제</button>
+                  ${liveYarn ? `<button type="button" class="text-btn primary" data-record-yarn="${l.yarnId}">${l.pending ? 'Record Usage' : 'Edit'}</button>` : ''}
+                  <button type="button" class="text-btn" data-unlink-yarn="${l.yarnId}">Unlink</button>
                 </li>`;
             }).join('')}
             ${project.yarnText ? `
@@ -2624,15 +2644,15 @@ const App = (() => {
         const yarnId = btn.dataset.unlinkYarn;
         const link = (Storage.getProject(id).yarns || []).find((l) => l.yarnId === yarnId);
         if (!link || link.pending) {
-          const ok = await Modal.confirm({ title: '실 연결을 해제할까요?', message: '아직 사용량을 기록하지 않아서 실 보유량은 그대로예요.', okLabel: '해제', cancelLabel: '취소' });
+          const ok = await Modal.confirm({ title: '실 연결을 해제할까요?', message: '아직 사용량을 기록하지 않아서 실 보유량은 그대로예요.', okLabel: 'Unlink', cancelLabel: 'Cancel' });
           if (!ok) return;
           Storage.unlinkYarnFromProject(id, yarnId, false);
         } else {
           const restore = await Modal.confirm({
             title: '연결을 해제할까요?',
             message: '기록한 사용량만큼 실 보관함 보유량을 되돌릴까요?',
-            okLabel: '되돌리기',
-            cancelLabel: '되돌리지 않기',
+            okLabel: 'Restore',
+            cancelLabel: 'Keep',
           });
           Storage.unlinkYarnFromProject(id, yarnId, restore);
         }
@@ -2665,8 +2685,8 @@ const App = (() => {
           const goUpload = await Modal.confirm({
             title: '등록된 도안이 없어요',
             message: 'Patterns 탭에서 먼저 도안을 추가해주세요.',
-            okLabel: '도안 추가하러 가기',
-            cancelLabel: '닫기',
+            okLabel: 'Add Pattern',
+            cancelLabel: 'Close',
           });
           if (goUpload) go('#/pattern/new');
           return;
@@ -2694,8 +2714,8 @@ const App = (() => {
         const ok = await Modal.confirm({
           title: 'Ravelry 링크를 해제할까요?',
           message: 'Favorites에 찜해둔 도안은 그대로 남아요.',
-          okLabel: '해제',
-          cancelLabel: '취소',
+          okLabel: 'Unlink',
+          cancelLabel: 'Cancel',
         });
         if (!ok) return;
         Storage.updateProject(id, { ravelryPattern: null });
@@ -2710,8 +2730,8 @@ const App = (() => {
         const ok = await Modal.confirm({
           title: '도안 연결을 해제할까요?',
           message: '하이라이트 위치가 사라져요. 도안 파일 자체는 그대로 남아요.',
-          okLabel: '해제',
-          cancelLabel: '취소',
+          okLabel: 'Unlink',
+          cancelLabel: 'Cancel',
         });
         if (!ok) return;
         Storage.unlinkPatternFromProject(id);

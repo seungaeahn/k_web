@@ -96,7 +96,7 @@ a { color: var(--label); }
   :root { --app-max: 720px; }
   #app { padding-left: var(--s-4); padding-right: var(--s-4); }
 }
-#app, .tabbar, .banner { max-width: var(--app-max, 480px); }
+#app, .banner { max-width: var(--app-max, 480px); }
 
 /* 도안 뷰어: 화면 전체 폭·높이를 쓰도록 */
 body[data-view="pattern-viewer"] {
@@ -391,6 +391,9 @@ a.icon-btn { color: var(--text); text-decoration: none; }
   background: var(--surface); border-top: var(--lace);
   display: flex; margin: 0 auto;
   padding-bottom: env(safe-area-inset-bottom, 0);
+  /* 배경은 화면 끝까지, 메뉴는 본문 폭(--app-max)에 맞춰 가운데 */
+  padding-left: max(0px, calc((100% - var(--app-max, 480px)) / 2));
+  padding-right: max(0px, calc((100% - var(--app-max, 480px)) / 2));
 }
 .tabbar a {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -674,3 +677,50 @@ a.knit-card:active { transform: translate(2px, 2px); box-shadow: none; }
 label.btn { cursor: pointer; }
 .backup-card .card-meta + .btn { margin-top: 0; }
 .needle-field { display: flex; flex-direction: column; gap: var(--s-1); }
+
+/* 태블릿 가로(900px~): 목록 화면은 넓게 + 카드 2열, 읽기·입력 화면은 읽기 좋은 720px 유지 */
+@media (min-width: 900px) {
+  :root { --app-max: 1040px; }
+  body[data-view="project-detail"], body[data-view="project-form"], body[data-view="yarn-form"],
+  body[data-view="pattern-form"], body[data-view^="tools-"] { --app-max: 720px; }
+  .list:has(> .card) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .list:has(> .card) > :not(.card) { grid-column: 1 / -1; }
+  .archive-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .detail-hero { aspect-ratio: 2 / 1; }
+}
+@media (min-width: 1200px) {
+  .archive-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* 버튼 글자(Save, Delete, Edit ...): 문막 달반체. 얇은 글꼴이라 조금 크게 */
+.btn, .text-btn, .icon-btn.display-text { font-family: var(--font-display); font-weight: 400; letter-spacing: .03em; }
+.btn { font-size: 17px; }
+.btn.sm { font-size: 14px; }
+.text-btn { font-size: 15px; color: var(--text-2); }
+.icon-btn.display-text { font-size: 15px; }
+.icon-btn.sm.display-text { font-size: 13px; }
+
+/* hidden 속성이 display 스타일에 덮이지 않게 (결과 칸 등) */
+[hidden] { display: none !important; }
+
+/* 게이지 계산기 */
+.gauge-form { display: flex; flex-direction: column; }
+.gauge-card { display: flex; flex-direction: column; gap: var(--s-2); }
+.gauge-card h3, .gauge-card .card-meta { margin: 0; }
+.gauge-card .grid-2 { gap: var(--s-2) var(--s-3); }
+.gauge-result {
+  margin-bottom: var(--s-3); padding: var(--s-3); text-align: center;
+  border: var(--lace); border-radius: var(--r-l);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.gauge-result.is-ready { border: var(--outline); box-shadow: var(--shadow); }
+.gauge-result-nums { display: flex; align-items: flex-end; justify-content: center; gap: var(--s-3); }
+.gauge-result-item { display: flex; align-items: baseline; gap: 4px; }
+.gauge-result-item strong { font-size: 40px; font-weight: 800; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.gauge-result-item span { font-size: var(--fs-body); font-weight: 700; color: var(--text-2); }
+.gauge-result-x { font-size: 22px; color: var(--text-3); padding-bottom: 4px; }
+.gauge-result .card-meta { margin: var(--s-2) 0 0; }

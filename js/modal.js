@@ -29,7 +29,7 @@ const Modal = (() => {
     });
   }
 
-  async function confirm({ title, message, okLabel = '확인', cancelLabel = '취소', danger = false }) {
+  async function confirm({ title, message, okLabel = 'OK', cancelLabel = 'Cancel', danger = false }) {
     const res = await open({
       title,
       bodyHtml: `<p>${message}</p>`,
