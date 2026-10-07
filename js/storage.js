@@ -82,7 +82,8 @@ const Storage = (() => {
       name: data.name,
       // 새 작품은 WIP 또는 CO Waiting List(onhold)로 시작
       status: data.status === 'onhold' ? 'onhold' : 'active',
-      startDate: data.startDate || Utils.todayStr(),
+      // CO Waiting List는 아직 시작 전이라 시작일을 비워둠 (Cast On 때 기록)
+      startDate: data.status === 'onhold' ? (data.startDate || '') : (data.startDate || Utils.todayStr()),
       completedDate: null,
       yarnText: data.yarnText || '',
       needleSize: data.needleSize || '',

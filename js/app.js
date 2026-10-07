@@ -163,6 +163,14 @@ const App = (() => {
     return `<div class="empty-state">${art ? `<div class="empty-art">${Icons.stitch(art)}</div>` : ''}<p class="empty-title">${title}</p><p class="empty-desc">${desc}</p></div>`;
   }
 
+  // 단수 카운터는 사용자가 도안 뷰어에서 추가한 작품에서만 보여줌.
+  // 예전 작품(counterEnabled 없음)은 이미 단수를 센 적이 있으면 켜진 걸로 봄.
+  function isCounterOn(project) {
+    if (!project) return false;
+    if (project.counterEnabled != null) return !!project.counterEnabled;
+    return Storage.getCountersByProject(project.id).some((c) => c.value > 0);
+  }
+
   function projectCard(p) {
     const cover = p.photos && p.photos[p.mainPhotoIndex || 0];
     const counters = Storage.getCountersByProject(p.id);
@@ -175,7 +183,7 @@ const App = (() => {
         <div class="card-body">
           <h3 class="project-card-title">${Utils.escapeHtml(p.name)}</h3>
         </div>
-        ${main && !isCO ? `
+        ${main && !isCO && isCounterOn(p) ? `
           <div class="row-count">
             <div class="row-count-num">${Icons.stitchNumber(main.value, 0.3)}</div>
             <span class="row-count-unit">단</span>
@@ -202,6 +210,15 @@ const App = (() => {
     });
   }
 
+  // 인스타그램 게시글 주소 → { url, embed } (게시물 /p/, 릴스 /reel/, /tv/ 지원)
+  function parseInstagramUrl(raw) {
+    const m = String(raw || '').trim().match(/instagram\.com\/(?:[^/?#]+\/)?(p|reel|tv)\/([A-Za-z0-9_-]+)/i);
+    if (!m) return null;
+    const kind = m[1].toLowerCase();
+    const url = `https://www.instagram.com/${kind}/${m[2]}/`;
+    return { url, embed: `${url}embed/` };
+  }
+
   function archiveCard(p) {
     const cover = p.photos && p.photos[p.mainPhotoIndex || 0];
     return `
@@ -209,7 +226,7 @@ const App = (() => {
         <div class="card-thumb square">${cover ? `<img src="${cover}" alt="">` : `<div class="thumb-stitch is-archive">${Icons.stitch('sweater', 0.3)}</div>`}</div>
         <div class="card-body">
           <h3>${Utils.escapeHtml(p.name)}</h3>
-          <p class="card-meta">${Utils.formatDate(p.completedDate)}</p>
+          <p class="card-meta">${Utils.formatDate(p.completedDate)}${p.instagramUrl ? ' · <span class="ig-mark">Instagram</span>' : ''}</p>
         </div>
       </div>`;
   }
@@ -1448,25 +1465,39 @@ const App = (() => {
           <button type="button" class="icon-btn" data-action="move-down">▼</button>
         </div>
       </div>
-      ${viewerCounter ? `
-        <div class="viewer-counter" data-counter-id="${viewerCounter.id}">
-          <button type="button" class="btn ghost" data-action="viewer-minus" aria-label="한 단 빼기">-1</button>
-          <div class="viewer-counter-value">
-            <span class="viewer-counter-num" id="viewer-counter-num">${Icons.stitchNumber(viewerCounter.value, 0.3)}</span>
-            <span class="viewer-counter-name">${Utils.escapeHtml(project.name)} · ${Utils.escapeHtml(viewerCounter.name)}</span>
-          </div>
-          <button type="button" class="btn primary viewer-plus" data-action="viewer-plus" aria-label="한 단 추가">+1</button>
-        </div>` : ''}
+      ${viewerCounter ? '<div id="viewer-counter-slot"></div>' : ''}
       ${!project ? `<p class="card-meta" style="text-align:center;margin-top:8px">작품에 연결하면 하이라이트 위치가 저장되고 단수 카운터를 같이 쓸 수 있어요.</p>` : ''}
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
 
-    // 도안을 보면서 단수 세기: 화면 전체를 다시 그리면 도안을 다시 불러오므로 숫자만 갱신
-    if (viewerCounter) {
-      const numEl = root.querySelector('#viewer-counter-num');
+    // 도안을 보면서 단수 세기: 사용자가 "+ 단수 카운터"로 추가한 작품에서만 보여줌.
+    // 화면 전체를 다시 그리면 도안을 다시 불러오므로 카운터 자리만 다시 그림.
+    const counterSlot = root.querySelector('#viewer-counter-slot');
+    function renderCounterDock() {
+      if (!counterSlot) return;
+      if (!isCounterOn(Storage.getProject(project.id))) {
+        counterSlot.innerHTML = '<button type="button" class="btn ghost block viewer-add-counter" data-action="enable-counter">+ 단수 카운터</button>';
+        counterSlot.querySelector('[data-action="enable-counter"]').addEventListener('click', () => {
+          Storage.updateProject(project.id, { counterEnabled: true });
+          renderCounterDock();
+        });
+        return;
+      }
+      const current = () => Storage.getCountersByProject(project.id).find((c) => c.id === viewerCounter.id);
+      counterSlot.innerHTML = `
+        <div class="viewer-counter" data-counter-id="${viewerCounter.id}">
+          <button type="button" class="btn ghost" data-action="viewer-minus" aria-label="한 단 빼기">-1</button>
+          <div class="viewer-counter-value">
+            <span class="viewer-counter-num" id="viewer-counter-num">${Icons.stitchNumber((current() || viewerCounter).value, 0.3)}</span>
+            <span class="viewer-counter-name">${Utils.escapeHtml(project.name)} · ${Utils.escapeHtml(viewerCounter.name)}</span>
+          </div>
+          <button type="button" class="btn primary viewer-plus" data-action="viewer-plus" aria-label="한 단 추가">+1</button>
+          <button type="button" class="icon-btn sm viewer-counter-close" data-action="disable-counter" aria-label="단수 카운터 숨기기">×</button>
+        </div>`;
+      const numEl = counterSlot.querySelector('#viewer-counter-num');
       const refreshCount = () => {
-        const fresh = Storage.getCountersByProject(project.id).find((c) => c.id === viewerCounter.id);
+        const fresh = current();
         if (fresh) numEl.innerHTML = Icons.stitchNumber(fresh.value, 0.3);
         return fresh;
       };
@@ -1480,12 +1511,18 @@ const App = (() => {
         // 주기 자동 리셋은 900ms 뒤에 일어나서 한 번 더 갱신
         if (fresh.autoReset) setTimeout(refreshCount, 950);
       };
-      root.querySelector('[data-action="viewer-plus"]').addEventListener('click', () => {
+      counterSlot.querySelector('[data-action="viewer-plus"]').addEventListener('click', () => {
         if (!canTap(viewerCounter.id)) return;
         bump(1);
       });
-      root.querySelector('[data-action="viewer-minus"]').addEventListener('click', () => bump(-1));
+      counterSlot.querySelector('[data-action="viewer-minus"]').addEventListener('click', () => bump(-1));
+      // 숨겨도 센 단수는 그대로 남음
+      counterSlot.querySelector('[data-action="disable-counter"]').addEventListener('click', () => {
+        Storage.updateProject(project.id, { counterEnabled: false });
+        renderCounterDock();
+      });
     }
+    renderCounterDock();
 
     // zoom is relative to "fit to viewport width" (1 = 100% = fills the width),
     // so the pattern opens at a readable size on phones and tablets alike and
@@ -1874,9 +1911,9 @@ const App = (() => {
           <input type="text" name="name" value="${project ? Utils.escapeHtml(project.name) : ''}" placeholder="예: 겨울 목도리">
           <p class="field-error" id="name-error" hidden>작품명을 입력해주세요.</p>
         </label>
-        <label class="field">
+        <label class="field" id="start-date-field">
           <span>시작일</span>
-          <input type="date" name="startDate" value="${project ? project.startDate : Utils.todayStr()}">
+          <input type="date" name="startDate" value="${project ? (project.startDate || '') : Utils.todayStr()}">
         </label>
         <label class="field">
           <span>사용 실</span>
@@ -1917,6 +1954,8 @@ const App = (() => {
 
       const renderStatus = () => {
         statusRow.querySelectorAll('[data-new-status]').forEach((b) => b.classList.toggle('active', b.dataset.newStatus === status));
+        // 아직 코를 안 잡았으면 시작일은 Cast On 할 때 기록
+        root.querySelector('#start-date-field').hidden = status === 'onhold';
       };
       statusRow.addEventListener('click', (e) => {
         const b = e.target.closest('[data-new-status]');
@@ -2049,7 +2088,7 @@ const App = (() => {
       errorEl.hidden = true;
       const data = {
         name,
-        startDate: fd.get('startDate') || Utils.todayStr(),
+        startDate: !editing && status === 'onhold' ? '' : (fd.get('startDate') || (editing ? '' : Utils.todayStr())),
         yarnText: String(fd.get('yarnText') || '').trim(),
         needleSize: String(fd.get('needleSize') || '').trim(),
         memo: String(fd.get('memo') || '').trim(),
@@ -2107,9 +2146,6 @@ const App = (() => {
     const project = Storage.getProject(id);
     if (!project) return go('#/');
     setActiveTab('projects');
-    const counters = Storage.getCountersByProject(id);
-    const mainCounter = counters.find((c) => c.isDefault) || counters[0];
-    const extraCounters = counters.filter((c) => c.id !== (mainCounter && mainCounter.id));
     root.innerHTML = `
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
@@ -2123,25 +2159,41 @@ const App = (() => {
         ${statusButton(project, 'completed', 'FO')}
       </div>
       ${project.status === 'completed' ? `
-        <div class="field inline">
+        <div class="field inline completed-row">
           <span>완성일</span>
           <input type="date" id="completed-date" value="${project.completedDate || Utils.todayStr()}">
+        </div>
+        <div class="info-block ig-block">
+          <div class="section-title-row">
+            <h3>Instagram</h3>
+            ${project.instagramUrl ? '<button type="button" class="text-btn" data-action="ig-remove">해제</button>' : ''}
+          </div>
+          ${parseInstagramUrl(project.instagramUrl) ? `
+            <div class="ig-embed">
+              <iframe src="${parseInstagramUrl(project.instagramUrl).embed}" title="Instagram 게시글" loading="lazy" scrolling="no" allowtransparency="true"></iframe>
+            </div>
+            <a class="text-btn primary ig-open" href="${parseInstagramUrl(project.instagramUrl).url}" target="_blank" rel="noopener">Instagram에서 보기</a>` : `
+            <label class="field">
+              <div class="input-with-action">
+                <input type="url" id="ig-url" placeholder="https://www.instagram.com/p/..." enterkeyhint="done">
+                <button type="button" class="btn ghost sm" data-action="ig-save">저장</button>
+              </div>
+            </label>
+            <p class="card-meta">완성작을 올린 게시글의 링크를 붙여넣으면 여기에 같이 보여줘요. 게시글 아래 공유(종이비행기) → "링크 복사"로 가져올 수 있어요.</p>`}
         </div>` : ''}
 
-      ${mainCounter ? mainCounterBlock(mainCounter) : ''}
-
-      <div class="extra-counters">
-        <div class="section-title-row">
-          <h3>추가 카운터</h3>
-          <button class="btn ghost sm" data-action="add-counter">+ 카운터 추가</button>
-        </div>
-        ${extraCounters.map((c) => extraCounterRow(c)).join('')}
-      </div>
+      ${project.status === 'onhold' ? `
+        <div class="cast-on-card">
+          <div class="cast-on-art">${Icons.stitch('yarn', 0.35)}</div>
+          <p class="cast-on-title">아직 코를 잡기 전이에요</p>
+          <p class="card-meta">코를 잡으면 눌러주세요. WIP로 옮기고 시작일을 오늘로 기록해요.</p>
+          <button type="button" class="btn primary block display-btn cast-on-btn" data-action="cast-on">Cast On</button>
+        </div>` : ''}
 
       <div class="info-block">
         <h3>작품 정보</h3>
         <dl>
-          <dt>시작일</dt><dd>${Utils.formatDate(project.startDate)}</dd>
+          <dt>시작일</dt><dd>${Utils.formatDate(project.startDate) || '-'}</dd>
           <dt>사용 실</dt><dd>${Utils.escapeHtml(project.yarnText) || '-'}</dd>
           <dt>바늘 호수</dt><dd>${Utils.escapeHtml(project.needleSize) || '-'}</dd>
           <dt>메모</dt><dd class="pre">${Utils.escapeHtml(project.memo) || '-'}</dd>
@@ -2212,6 +2264,34 @@ const App = (() => {
       btn.addEventListener('click', () => onStatusChange(project, btn.dataset.status));
     });
 
+    const igInput = root.querySelector('#ig-url');
+    if (igInput) {
+      const saveIg = () => {
+        const parsed = parseInstagramUrl(igInput.value);
+        if (!parsed) {
+          showBanner('인스타그램 게시글 링크를 확인해주세요.', 'warn');
+          return;
+        }
+        Storage.updateProject(id, { instagramUrl: parsed.url });
+        showBanner('Instagram 게시글을 연결했어요.');
+        render();
+      };
+      root.querySelector('[data-action="ig-save"]').addEventListener('click', saveIg);
+      igInput.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.isComposing) return;
+        e.preventDefault();
+        saveIg();
+      });
+    }
+    const igRemove = root.querySelector('[data-action="ig-remove"]');
+    if (igRemove) {
+      igRemove.addEventListener('click', () => {
+        Storage.updateProject(id, { instagramUrl: '' });
+        showBanner('Instagram 연결을 해제했어요.');
+        render();
+      });
+    }
+
     const completedDateInput = root.querySelector('#completed-date');
     if (completedDateInput) {
       completedDateInput.addEventListener('change', () => {
@@ -2219,21 +2299,8 @@ const App = (() => {
       });
     }
 
-    if (mainCounter) bindCounterEvents(mainCounter, id);
-    extraCounters.forEach((c) => bindCounterEvents(c, id));
-
-    root.querySelector('[data-action="add-counter"]').addEventListener('click', async () => {
-      const res = await Modal.open({
-        title: '카운터 추가',
-        bodyHtml: `<label class="field"><span>이름</span><input type="text" data-field="name" placeholder="예: 무늬 반복" value="카운터"></label>`,
-        buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '추가', variant: 'primary' }],
-      });
-      if (res.id === 'ok') {
-        const name = (res.values.name || '카운터').trim() || '카운터';
-        Storage.createCounter({ projectId: id, name });
-        render();
-      }
-    });
+    const castOnBtn = root.querySelector('[data-action="cast-on"]');
+    if (castOnBtn) castOnBtn.addEventListener('click', () => castOn(project));
 
     root.querySelectorAll('[data-unlink-yarn]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -2359,8 +2426,19 @@ const App = (() => {
     return `<button class="chip display-chip ${project.status === status ? 'active' : ''}" data-status="${status}">${label}</button>`;
   }
 
+  // 코 잡기: CO Waiting List → WIP, 시작일을 오늘로
+  function castOn(project) {
+    Storage.updateProject(project.id, { status: 'active', startDate: Utils.todayStr() });
+    showBanner('Cast On! WIP로 옮겼어요.');
+    render();
+  }
+
   async function onStatusChange(project, status) {
     if (status === project.status) return;
+    if (project.status === 'onhold' && status === 'active') {
+      castOn(project);
+      return;
+    }
     if (status === 'completed') {
       Storage.updateProject(project.id, { status, completedDate: Utils.todayStr() });
       showBanner('FO로 옮겼어요. Archive에서 볼 수 있어요.');
@@ -2375,98 +2453,6 @@ const App = (() => {
     }
     Storage.updateProject(project.id, { status });
     render();
-  }
-
-  function mainCounterBlock(counter) {
-    return `
-      <div class="main-counter" data-counter-id="${counter.id}">
-        <div class="counter-header">
-          <span class="counter-name">${Utils.escapeHtml(counter.name)}</span>
-          <button class="icon-btn sm" data-action="counter-settings">⚙</button>
-        </div>
-        <button class="tap-area" data-action="counter-tap" aria-label="한 단 추가">
-          <span class="counter-value">${counter.value}</span>
-          ${counter.cycle > 0 ? `<span class="counter-cycle-tag">${counter.cycle}단마다 알림</span>` : ''}
-        </button>
-        <div class="counter-controls">
-          <button class="btn ghost sm" data-action="counter-minus">-1</button>
-          <button class="btn ghost sm" data-action="counter-reset">초기화</button>
-          <button class="btn primary sm" data-action="counter-plus">+1</button>
-        </div>
-      </div>`;
-  }
-
-  function extraCounterRow(counter) {
-    return `
-      <div class="counter-row" data-counter-id="${counter.id}">
-        <div class="counter-row-main">
-          <span class="counter-name">${Utils.escapeHtml(counter.name)}</span>
-          ${counter.cycle > 0 ? `<span class="counter-cycle-tag">${counter.cycle}단마다</span>` : ''}
-        </div>
-        <div class="counter-row-controls">
-          <button class="btn ghost sm" data-action="counter-minus">-1</button>
-          <span class="counter-row-value">${counter.value}</span>
-          <button class="btn ghost sm" data-action="counter-plus">+1</button>
-          <button class="icon-btn sm" data-action="counter-settings">⚙</button>
-          <button class="icon-btn sm" data-action="counter-delete">🗑</button>
-        </div>
-      </div>`;
-  }
-
-  function bindCounterEvents(counter, projectId) {
-    const scope = root.querySelector(`[data-counter-id="${counter.id}"]`);
-    if (!scope) return;
-
-    scope.querySelectorAll('[data-action="counter-tap"], [data-action="counter-plus"]').forEach((plusBtn) => {
-      plusBtn.addEventListener('click', () => {
-        if (!canTap(counter.id)) return;
-        changeCounter(counter, 1, projectId);
-        render();
-      });
-    });
-    const minusBtn = scope.querySelector('[data-action="counter-minus"]');
-    if (minusBtn) {
-      minusBtn.addEventListener('click', () => {
-        changeCounter(counter, -1, projectId);
-        render();
-      });
-    }
-    const resetBtn = scope.querySelector('[data-action="counter-reset"]');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', async () => {
-        const ok = await Modal.confirm({
-          title: '카운터를 초기화할까요?',
-          message: `"${Utils.escapeHtml(counter.name)}" 카운터를 0으로 되돌려요.`,
-          okLabel: '초기화',
-          cancelLabel: '취소',
-        });
-        if (ok) {
-          Storage.updateCounter(counter.id, { value: 0 });
-          Storage.setLastAction(null);
-          render();
-        }
-      });
-    }
-    const settingsBtn = scope.querySelector('[data-action="counter-settings"]');
-    if (settingsBtn) {
-      settingsBtn.addEventListener('click', () => openCounterSettings(counter, projectId));
-    }
-    const deleteBtn = scope.querySelector('[data-action="counter-delete"]');
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', async () => {
-        const ok = await Modal.confirm({
-          title: '카운터를 삭제할까요?',
-          message: `"${Utils.escapeHtml(counter.name)}" 카운터와 기록된 값이 삭제돼요.`,
-          okLabel: '삭제',
-          cancelLabel: '취소',
-          danger: true,
-        });
-        if (ok) {
-          Storage.deleteCounter(counter.id);
-          render();
-        }
-      });
-    }
   }
 
   function canTap(counterId) {
@@ -2490,7 +2476,6 @@ const App = (() => {
       if (counter.autoReset) {
         setTimeout(() => {
           Storage.updateCounter(counter.id, { value: 0 });
-          if (currentRoute.name === 'project-detail') render();
         }, 900);
       }
     }
@@ -2506,22 +2491,18 @@ const App = (() => {
     }, 1200);
   }
 
-  async function openCounterSettings(counter, projectId) {
-    const res = await Modal.open({
-      title: '카운터 설정',
-      bodyHtml: `
-        <label class="field"><span>이름</span><input type="text" data-field="name" value="${Utils.escapeHtml(counter.name)}"></label>
-        <label class="field"><span>N단마다 알림 (0 = 끔)</span><input type="number" min="0" data-field="cycle" value="${counter.cycle || 0}"></label>
-        <label class="field checkbox"><input type="checkbox" data-field="autoReset" ${counter.autoReset ? 'checked' : ''}><span>주기에 도달하면 0으로 자동 리셋</span></label>
-      `,
-      buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '저장', variant: 'primary' }],
+  // ---------- Instagram embed ----------
+  // 임베드 iframe은 내용 높이를 postMessage(MEASURE)로 알려줌. 받으면 그 높이로 맞추고, 못 받으면 CSS 기본 높이.
+  window.addEventListener('message', (e) => {
+    if (!/^https:\/\/(www\.)?instagram\.com$/.test(e.origin)) return;
+    let data = e.data;
+    try { if (typeof data === 'string') data = JSON.parse(data); } catch (err) { return; }
+    const height = data && data.type === 'MEASURE' && data.details && data.details.height;
+    if (!height) return;
+    root.querySelectorAll('.ig-embed iframe').forEach((frame) => {
+      if (frame.contentWindow === e.source) frame.style.height = `${Math.ceil(height)}px`;
     });
-    if (res.id !== 'ok') return;
-    const name = (res.values.name || counter.name).trim() || counter.name;
-    const cycle = Math.max(0, parseInt(res.values.cycle, 10) || 0);
-    Storage.updateCounter(counter.id, { name, cycle, autoReset: !!res.values.autoReset });
-    render();
-  }
+  });
 
   // ---------- Backup reminder ----------
   function checkBackupReminder() {

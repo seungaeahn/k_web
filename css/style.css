@@ -328,33 +328,9 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 .stat label { font-size: var(--fs-caption); color: var(--text-2); }
 
 
-.main-counter {
-  background: var(--surface); border: var(--outline); border-radius: var(--r-l);
-  box-shadow: var(--shadow);
-  padding: var(--s-2); margin-bottom: var(--s-3); transition: background 0.3s;
-}
-.main-counter.flash { background: var(--accent-soft); }
-.counter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s-2); gap: var(--s-2); }
-.counter-name { font-weight: 700; font-size: var(--fs-sub); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tap-area {
-  width: 100%; min-height: 168px; border: var(--border-w) solid var(--grid); border-radius: var(--r-m);
-  background-color: var(--surface);
-  background-image:
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-  background-size: 12px 12px;
-  transition: background-color 0.3s;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-2);
-  cursor: pointer; user-select: none;
-}
-.counter-value { font-size: var(--fs-counter); font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; }
-.counter-cycle-tag { font-size: var(--fs-label); font-weight: 600; color: var(--accent); }
-.tap-area:active { background-color: var(--accent-soft); }
-.main-counter.flash .tap-area { background-color: var(--accent-soft); }
 .counter-controls { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
 .counter-controls .btn { flex: 1; }
 
-.extra-counters { margin-bottom: var(--s-3); }
 .section-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-2); }
 .section-title-row h3 { margin: 0; font-size: var(--fs-sub); font-weight: 700; color: var(--text-2); }
 
@@ -595,3 +571,31 @@ a.btn { text-decoration: none; }
 .pattern-search .search-field, .pattern-search .status-row { margin: 0; }
 .pattern-search .results-list { margin-top: var(--s-1); }
 .info-block .card-meta + .btn { margin-top: var(--s-2); }
+
+/* 작품 상세: CO Waiting List → Cast On */
+.cast-on-card {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-1); text-align: center;
+  margin-bottom: var(--s-3); padding: var(--s-4) var(--s-3);
+  border: var(--lace); border-radius: var(--r-l);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.cast-on-art { width: 64px; margin-bottom: var(--s-1); color: var(--accent); }
+.cast-on-title { margin: 0; font-size: var(--fs-body); font-weight: 700; color: var(--text); }
+.cast-on-card .card-meta { margin: 0 0 var(--s-2); }
+.btn.display-btn.cast-on-btn { height: var(--btn-h); font-size: 22px; letter-spacing: .06em; }
+
+/* 도안 뷰어 단수 카운터: 추가 버튼 / 숨기기 */
+.viewer-add-counter { flex-shrink: 0; margin-top: var(--s-1); border-style: dashed; color: var(--text-2); }
+.viewer-counter .icon-btn.viewer-counter-close { flex-shrink: 0; align-self: flex-start; padding: var(--s-1); font-size: 18px; line-height: 1; color: var(--text-3); }
+
+/* FO 작품: Instagram 게시글 */
+.ig-block .card-meta { margin-top: var(--s-1); }
+.ig-embed { border-radius: var(--r-m); overflow: hidden; border: var(--border-w) solid var(--border); background: var(--surface); }
+.ig-embed iframe { display: block; width: 100%; height: 560px; border: 0; }
+.ig-open { display: inline-block; margin-top: var(--s-1); padding-left: 0; }
+.ig-mark { color: var(--label); font-weight: 600; }
+.completed-row { margin-bottom: var(--s-3); }
