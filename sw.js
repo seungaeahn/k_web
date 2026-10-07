@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kw-cache-v76';
+const CACHE_NAME = 'kw-cache-v84';
 const APP_SHELL = [
   './',
   './index.html',

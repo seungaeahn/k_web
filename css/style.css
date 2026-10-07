@@ -176,7 +176,8 @@ a.icon-btn { color: var(--text); text-decoration: none; }
   padding: var(--s-2);
   transition: transform .08s, box-shadow .08s;
 }
-.card[data-yarn-id]:active, .card[data-project-id]:active, .card[data-pattern-id]:active { transform: translate(2px, 2px); box-shadow: none; }
+.card[data-yarn-id]:active, .card[data-project-id]:active, .card[data-pattern-id]:active, .card[data-ravelry-url]:active { transform: translate(2px, 2px); box-shadow: none; }
+.card[data-yarn-id], .card[data-project-id], .card[data-pattern-id], .card[data-ravelry-url] { cursor: pointer; }
 .card-thumb {
   width: 64px; height: 64px; border-radius: var(--r-m); overflow: hidden;
   flex-shrink: 0; border: var(--border-w) solid var(--grid);
@@ -553,6 +554,8 @@ a.icon-btn { color: var(--text); text-decoration: none; }
 .heart-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 a.btn { text-decoration: none; }
 .card-body .counter-controls .btn { flex: 0 0 auto; }
+/* 도안 카드 버튼(Start Project / Ravelry)은 작게, 높이 맞춤 */
+.card-body .counter-controls .btn.sm { height: 30px; padding: 0 var(--s-2); font-size: 13px; }
 
 /* Tools 메뉴 */
 .tools-menu { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -566,3 +569,23 @@ a.btn { text-decoration: none; }
 .tools-menu-title { font-family: var(--font-display); font-size: 20px; line-height: 1.3; }
 .tools-menu-sub { font-size: var(--fs-label); color: var(--text-2); }
 .tools-menu-arrow { flex-shrink: 0; color: var(--label); font-weight: 700; }
+
+/* 영어 버튼(Start Project 등): 문막 달반체 */
+.btn.display-btn { font-family: var(--font-display); font-weight: 400; font-size: 13px; letter-spacing: .02em; height: 30px; padding: 0 var(--s-2); }
+
+/* New Project: 고른 도안 카드 */
+.source-card {
+  background: var(--surface); border: var(--outline); border-radius: var(--r-l);
+  box-shadow: var(--shadow); padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+}
+.field .source-card .link-item-name { font-size: var(--fs-body); font-weight: 600; color: var(--text); }
+.field .source-card .link-item-meta { font-size: var(--fs-label); font-weight: 400; color: var(--text-2); }
+
+/* 도안 카드(Library / Favorites): 같은 높이, 버튼은 항상 아래쪽 */
+.pattern-card { align-items: stretch; }
+.pattern-card .card-thumb { width: 80px; height: 80px; }
+.pattern-card .thumb-stitch.is-pattern { width: 44px; }
+.pattern-card .card-body { display: flex; flex-direction: column; min-height: 80px; }
+.pattern-card .card-title-row { min-height: 24px; }
+.pattern-card .card-meta { margin-top: 2px; }
+.pattern-card .counter-controls { margin-top: auto; padding-top: var(--s-1); }

@@ -80,7 +80,8 @@ const Storage = (() => {
     const project = {
       id: Utils.uid(),
       name: data.name,
-      status: 'active',
+      // 새 작품은 WIP 또는 CO Waiting List(onhold)로 시작
+      status: data.status === 'onhold' ? 'onhold' : 'active',
       startDate: data.startDate || Utils.todayStr(),
       completedDate: null,
       yarnText: data.yarnText || '',
@@ -90,6 +91,8 @@ const Storage = (() => {
       mainPhotoIndex: 0,
       yarns: data.yarns || [],
       patternId: data.patternId || null,
+      // Favorites(Ravelry)에서 시작한 작품: { id, name, url } — 파일이 없어서 링크로만 연결
+      ravelryPattern: data.ravelryPattern || null,
       highlight: data.highlight || null,
       lastWorkedAt: now,
       createdAt: now,
@@ -375,11 +378,11 @@ const Storage = (() => {
     return write(KEYS.savedPatterns, list);
   }
   function isPatternSaved(ravelryPatternId) {
-    return getSavedPatterns().some((p) => p.ravelryPatternId === ravelryPatternId);
+    return getSavedPatterns().some((p) => String(p.ravelryPatternId) === String(ravelryPatternId));
   }
   function saveFavoritePattern(data) {
     const list = getSavedPatterns();
-    if (list.some((p) => p.ravelryPatternId === data.ravelryPatternId)) return null;
+    if (list.some((p) => String(p.ravelryPatternId) === String(data.ravelryPatternId))) return null;
     const rec = {
       id: Utils.uid(),
       ravelryPatternId: data.ravelryPatternId,
@@ -393,8 +396,16 @@ const Storage = (() => {
     saveSavedPatterns(list);
     return rec;
   }
+  function updateFavoritePattern(ravelryPatternId, patch) {
+    const list = getSavedPatterns();
+    const idx = list.findIndex((p) => String(p.ravelryPatternId) === String(ravelryPatternId));
+    if (idx === -1) return null;
+    list[idx] = { ...list[idx], ...patch };
+    saveSavedPatterns(list);
+    return list[idx];
+  }
   function unfavoritePattern(ravelryPatternId) {
-    saveSavedPatterns(getSavedPatterns().filter((p) => p.ravelryPatternId !== ravelryPatternId));
+    saveSavedPatterns(getSavedPatterns().filter((p) => String(p.ravelryPatternId) !== String(ravelryPatternId)));
   }
 
   // ---- Backup ----
@@ -472,7 +483,7 @@ const Storage = (() => {
     getMissingDefaultAbbreviations, restoreDefaultAbbreviations,
     getPatterns, getPattern, createPattern, updatePattern, deletePattern,
     getProjectsLinkedToPattern, linkPatternToProject, unlinkPatternFromProject, saveProjectHighlight,
-    getSavedPatterns, isPatternSaved, saveFavoritePattern, unfavoritePattern,
+    getSavedPatterns, isPatternSaved, saveFavoritePattern, updateFavoritePattern, unfavoritePattern,
     exportBackup, importBackup,
     getSettings, saveSettings,
     getActiveSession, setActiveSession,

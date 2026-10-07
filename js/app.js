@@ -68,7 +68,12 @@ const App = (() => {
       return { name: 'tools-home', params: {} };
     }
     if (parts[0] === 'project') {
-      if (parts[1] === 'new') return { name: 'project-form', params: {} };
+      if (parts[1] === 'new') {
+        // 도안에서 시작: #/project/new/pattern/{id} (Library) · #/project/new/favorite/{ravelryId} (Favorites)
+        if (parts[2] === 'pattern' && parts[3]) return { name: 'project-form', params: { from: { kind: 'pattern', id: parts[3] } } };
+        if (parts[2] === 'favorite' && parts[3]) return { name: 'project-form', params: { from: { kind: 'favorite', id: parts[3] } } };
+        return { name: 'project-form', params: {} };
+      }
       if (parts[2] === 'edit') return { name: 'project-form', params: { id: parts[1] } };
       if (parts[1]) return { name: 'project-detail', params: { id: parts[1] } };
     }
@@ -93,7 +98,7 @@ const App = (() => {
     switch (route.name) {
       case 'list': return renderList();
       case 'archive': return renderArchive();
-      case 'project-form': return renderProjectForm(route.params.id);
+      case 'project-form': return renderProjectForm(route.params.id, route.params.from);
       case 'project-detail': return renderProjectDetail(route.params.id);
       case 'yarn-list': return renderYarnList();
       case 'yarn-form': return renderYarnForm(route.params.id);
@@ -907,7 +912,11 @@ const App = (() => {
         ? emptyState('아직 등록한 도안이 없어요', '이미지나 PDF로 된 도안을 추가해보세요.')
         : patterns.map(patternCard).join('');
       body.querySelectorAll('[data-pattern-id]').forEach((el) => {
-        el.addEventListener('click', () => go(`#/pattern/${el.dataset.patternId}`));
+        el.addEventListener('click', (e) => {
+          // Start Project 버튼은 링크 그대로 이동 (카드 클릭으로 도안 뷰어가 열리지 않게)
+          if (e.target.closest('[data-start-project]')) return;
+          go(`#/pattern/${el.dataset.patternId}`);
+        });
       });
     } else {
       body.innerHTML = saved.length === 0
@@ -920,6 +929,14 @@ const App = (() => {
           renderPatternList('saved');
         });
       });
+      backfillFavoriteNeedles();
+      // 카드를 누르면 Ravelry 도안 페이지를 새 탭으로 (하트, Start Project는 제외)
+      body.querySelectorAll('[data-ravelry-url]').forEach((card) => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('[data-unfavorite], [data-start-project]')) return;
+          window.open(card.dataset.ravelryUrl, '_blank', 'noopener');
+        });
+      });
     }
 
     root.querySelector('#pattern-tab-switch').addEventListener('click', (e) => {
@@ -927,6 +944,36 @@ const App = (() => {
       if (!btn) return;
       go(btn.dataset.tab === 'saved' ? '#/pattern/saved' : '#/pattern');
     });
+  }
+
+  // 예전에 찜해서 바늘 정보가 없는 Favorites를 Ravelry에서 한 번 더 불러와 채움.
+  // 한 번 확인한 도안은 needleChecked로 표시해서 (Ravelry에 바늘 정보가 없어도) 다시 부르지 않음.
+  let favoriteNeedleBackfillRunning = false;
+  async function backfillFavoriteNeedles() {
+    if (favoriteNeedleBackfillRunning || !Ravelry.isConfigured() || !navigator.onLine) return;
+    const missing = Storage.getSavedPatterns().filter((f) => !f.needleSize && !f.needleChecked);
+    if (!missing.length) return;
+    favoriteNeedleBackfillRunning = true;
+    let filled = 0;
+    try {
+      for (const fav of missing) {
+        try {
+          const needleSize = await Ravelry.getPatternNeedles(fav.ravelryPatternId);
+          Storage.updateFavoritePattern(fav.ravelryPatternId, { needleSize, needleChecked: true });
+          if (needleSize) filled += 1;
+        } catch (err) {
+          // 네트워크·인증 오류는 표시하지 않고 다음에 다시 시도
+          console.error(err);
+          break;
+        }
+      }
+    } finally {
+      favoriteNeedleBackfillRunning = false;
+    }
+    // 아직 Favorites 탭을 보고 있으면 채운 정보로 다시 그림
+    if (filled && currentRoute.name === 'pattern-list' && currentRoute.params.tab === 'saved') {
+      renderPatternList('saved');
+    }
   }
 
   // 찜 버튼: 찜하면 꽉 찬 하트, 아니면 빈 하트
@@ -943,7 +990,7 @@ const App = (() => {
 
   function savedPatternCard(p) {
     return `
-      <div class="card">
+      <div class="card pattern-card" data-ravelry-url="${Utils.escapeHtml(p.url)}">
         <div class="card-thumb">${p.photoUrl ? `<img src="${p.photoUrl}" alt="">` : `<div class="thumb-stitch is-pattern">${Icons.stitch('pattern', 0.4)}</div>`}</div>
         <div class="card-body">
           <div class="card-title-row">
@@ -952,7 +999,7 @@ const App = (() => {
           </div>
           ${p.needleSize ? `<p class="card-meta">바늘 ${Utils.escapeHtml(p.needleSize)}</p>` : ''}
           <div class="counter-controls">
-            <a class="btn ghost sm" href="${p.url}" target="_blank" rel="noopener">Ravelry</a>
+            <a class="btn primary sm display-btn" href="#/project/new/favorite/${p.ravelryPatternId}" data-start-project>Start Project</a>
           </div>
         </div>
       </div>`;
@@ -960,11 +1007,14 @@ const App = (() => {
 
   function patternCard(pt) {
     return `
-      <div class="card" data-pattern-id="${pt.id}">
+      <div class="card pattern-card" data-pattern-id="${pt.id}">
         <div class="card-thumb"><div class="thumb-stitch is-pattern">${Icons.stitch('pattern', 0.4)}</div></div>
         <div class="card-body">
           <div class="card-title-row"><h3>${Utils.escapeHtml(pt.name)}</h3></div>
-          <p class="card-sub">${[pt.fileType === 'pdf' ? `PDF · ${pt.pageCount}페이지` : '이미지', pt.needleSize && `바늘 ${Utils.escapeHtml(pt.needleSize)}`].filter(Boolean).join(' · ')}</p>
+          ${pt.needleSize ? `<p class="card-meta">바늘 ${Utils.escapeHtml(pt.needleSize)}</p>` : ''}
+          <div class="counter-controls">
+            <a class="btn primary sm display-btn" href="#/project/new/pattern/${pt.id}" data-start-project>Start Project</a>
+          </div>
         </div>
       </div>`;
   }
@@ -1215,6 +1265,7 @@ const App = (() => {
       <header class="page-header with-back">
         <button class="icon-btn" data-action="back">←</button>
         <h1>${Utils.escapeHtml(pattern.name)}</h1>
+        ${project ? '' : `<a class="btn primary sm display-btn" href="#/project/new/pattern/${patternId}">Start Project</a>`}
         <a class="icon-btn" href="#/pattern/${patternId}/edit">수정</a>
       </header>
       <div class="pattern-toolbar">
@@ -1688,10 +1739,30 @@ const App = (() => {
   }
 
   // ---------- View: Project Form (create/edit) ----------
-  function renderProjectForm(id) {
+  // 도안 → 작품 시작 정보: Library 도안(파일) 또는 Favorites(Ravelry 링크)
+  function patternSource(from) {
+    if (!from) return null;
+    if (from.kind === 'pattern') {
+      const pt = Storage.getPattern(from.id);
+      return pt ? { kind: 'pattern', key: `pattern:${pt.id}`, name: pt.name, needleSize: pt.needleSize || '', patternId: pt.id } : null;
+    }
+    if (from.kind === 'favorite') {
+      const fav = Storage.getSavedPatterns().find((f) => String(f.ravelryPatternId) === String(from.id));
+      return fav ? {
+        kind: 'favorite', key: `favorite:${fav.ravelryPatternId}`, name: fav.name, needleSize: fav.needleSize || '',
+        ravelryPattern: { id: fav.ravelryPatternId, name: fav.name, url: fav.url },
+      } : null;
+    }
+    return null;
+  }
+
+  function renderProjectForm(id, from) {
     const editing = !!id;
     const project = editing ? Storage.getProject(id) : null;
     if (editing && !project) return go('#/');
+    let source = editing ? null : patternSource(from);
+    // 도안에서 시작하면 보통 "나중에 뜰 것"이라 CO Waiting List가 기본
+    let status = source ? 'onhold' : 'active';
 
     root.innerHTML = `
       <header class="page-header with-back">
@@ -1699,6 +1770,18 @@ const App = (() => {
         ${editing ? '<h1>작품 수정</h1>' : '<h1 class="display-title">New Project</h1>'}
       </header>
       <form id="project-form" class="form">
+        ${editing ? '' : `
+          <div class="field">
+            <span>도안</span>
+            <div id="pattern-source"></div>
+          </div>
+          <div class="field">
+            <span>상태</span>
+            <div class="status-row project-status" id="new-status">
+              <button type="button" class="chip display-chip" data-new-status="onhold">CO Waiting List</button>
+              <button type="button" class="chip display-chip" data-new-status="active">WIP</button>
+            </div>
+          </div>`}
         <label class="field">
           <span>작품명 <em>*</em></span>
           <input type="text" name="name" value="${project ? Utils.escapeHtml(project.name) : ''}" placeholder="예: 겨울 목도리">
@@ -1740,6 +1823,78 @@ const App = (() => {
     let photos = project ? [...(project.photos || [])] : [];
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    if (!editing) {
+      const sourceEl = root.querySelector('#pattern-source');
+      const statusRow = root.querySelector('#new-status');
+
+      const renderStatus = () => {
+        statusRow.querySelectorAll('[data-new-status]').forEach((b) => b.classList.toggle('active', b.dataset.newStatus === status));
+      };
+      statusRow.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-new-status]');
+        if (!b) return;
+        status = b.dataset.newStatus;
+        renderStatus();
+      });
+
+      const renderSource = () => {
+        sourceEl.innerHTML = source ? `
+          <ul class="link-list source-card">
+            <li class="link-item">
+              <div class="link-item-main">
+                <span class="link-item-name">${Utils.escapeHtml(source.name)}</span>
+                <span class="link-item-meta">${source.kind === 'pattern' ? 'Library' : 'Favorites · Ravelry'}${source.needleSize ? ` · 바늘 ${Utils.escapeHtml(source.needleSize)}` : ''}</span>
+              </div>
+              <button type="button" class="text-btn primary" data-action="pick-pattern">변경</button>
+              <button type="button" class="text-btn" data-action="clear-pattern">빼기</button>
+            </li>
+          </ul>`
+          : '<button type="button" class="btn ghost block" data-action="pick-pattern">도안에서 고르기</button>';
+        sourceEl.querySelectorAll('[data-action="pick-pattern"]').forEach((b) => b.addEventListener('click', pickPattern));
+        const clearBtn = sourceEl.querySelector('[data-action="clear-pattern"]');
+        if (clearBtn) clearBtn.addEventListener('click', () => { source = null; renderSource(); });
+      };
+
+      // 도안을 고르면 이름·바늘을 채움 (이미 적어둔 값은 overwrite일 때만 덮어씀)
+      const applySource = (next, overwrite) => {
+        const prev = source;
+        source = next;
+        const nameInput = root.querySelector('[name="name"]');
+        const needleInput = root.querySelector('[name="needleSize"]');
+        const wasAuto = (input, key) => prev && input.value.trim() === (prev[key] || '');
+        if (overwrite || !nameInput.value.trim() || wasAuto(nameInput, 'name')) nameInput.value = next.name;
+        if (next.needleSize && (overwrite || !needleInput.value.trim() || wasAuto(needleInput, 'needleSize'))) needleInput.value = next.needleSize;
+        renderSource();
+      };
+
+      async function pickPattern() {
+        const library = Storage.getPatterns();
+        const favorites = Storage.getSavedPatterns();
+        if (!library.length && !favorites.length) {
+          showBanner('Library나 Favorites에 도안이 없어요.', 'warn');
+          return;
+        }
+        const res = await Modal.open({
+          title: '도안에서 고르기',
+          bodyHtml: `
+            <label class="field"><span>도안</span>
+              <select data-field="src">
+                ${library.length ? `<optgroup label="Library">${library.map((pt) => `<option value="pattern:${pt.id}" ${source && source.key === `pattern:${pt.id}` ? 'selected' : ''}>${Utils.escapeHtml(pt.name)}</option>`).join('')}</optgroup>` : ''}
+                ${favorites.length ? `<optgroup label="Favorites">${favorites.map((f) => `<option value="favorite:${f.ravelryPatternId}" ${source && source.key === `favorite:${f.ravelryPatternId}` ? 'selected' : ''}>${Utils.escapeHtml(f.name)}</option>`).join('')}</optgroup>` : ''}
+              </select>
+            </label>`,
+          buttons: [{ id: 'cancel', label: '취소', variant: 'ghost' }, { id: 'ok', label: '고르기', variant: 'primary' }],
+        });
+        if (res.id !== 'ok' || !res.values.src) return;
+        const [kind, ...rest] = String(res.values.src).split(':');
+        const next = patternSource({ kind, id: rest.join(':') });
+        if (next) applySource(next, false);
+      }
+
+      renderStatus();
+      if (source) applySource(source, true); else renderSource();
+    }
 
     async function handlePhotoChange(e) {
       const files = Array.from(e.target.files || []);
@@ -1818,7 +1973,12 @@ const App = (() => {
         showBanner('작품을 수정했어요.');
         go(`#/project/${id}`);
       } else {
-        const created = Storage.createProject(data);
+        const created = Storage.createProject({
+          ...data,
+          status,
+          patternId: source && source.kind === 'pattern' ? source.patternId : null,
+          ravelryPattern: source && source.kind === 'favorite' ? source.ravelryPattern : null,
+        });
         showBanner('새 작품을 만들었어요.');
         go(`#/project/${created.id}`);
       }
@@ -1933,15 +2093,26 @@ const App = (() => {
           <h3>연결한 도안</h3>
           ${project.patternId && Storage.getPattern(project.patternId) ? '' : `<button type="button" class="btn ghost sm" data-action="link-pattern">+ 도안 연결</button>`}
         </div>
-        ${project.patternId && Storage.getPattern(project.patternId) ? `
+        ${(project.patternId && Storage.getPattern(project.patternId)) || project.ravelryPattern ? `
           <ul class="link-list">
-            <li class="link-item">
-              <div class="link-item-main">
-                <span class="link-item-name">${Utils.escapeHtml(Storage.getPattern(project.patternId).name)}</span>
-              </div>
-              <a class="text-btn primary" href="#/pattern/${project.patternId}/for/${id}">도안 보기</a>
-              <button type="button" class="text-btn" data-action="unlink-pattern">해제</button>
-            </li>
+            ${project.patternId && Storage.getPattern(project.patternId) ? `
+              <li class="link-item">
+                <div class="link-item-main">
+                  <span class="link-item-name">${Utils.escapeHtml(Storage.getPattern(project.patternId).name)}</span>
+                  <span class="link-item-meta">Library</span>
+                </div>
+                <a class="text-btn primary" href="#/pattern/${project.patternId}/for/${id}">도안 보기</a>
+                <button type="button" class="text-btn" data-action="unlink-pattern">해제</button>
+              </li>` : ''}
+            ${project.ravelryPattern ? `
+              <li class="link-item">
+                <div class="link-item-main">
+                  <span class="link-item-name">${Utils.escapeHtml(project.ravelryPattern.name)}</span>
+                  <span class="link-item-meta">Ravelry 링크</span>
+                </div>
+                <a class="text-btn primary" href="${project.ravelryPattern.url}" target="_blank" rel="noopener">Ravelry</a>
+                <button type="button" class="text-btn" data-action="unlink-ravelry">해제</button>
+              </li>` : ''}
           </ul>` : `
           <p class="card-meta">연결된 도안이 없어요.</p>`}
       </div>
@@ -2060,6 +2231,22 @@ const App = (() => {
         const fillNeedle = linked && linked.needleSize && !String(project.needleSize || '').trim();
         if (fillNeedle) Storage.updateProject(id, { needleSize: linked.needleSize });
         showBanner(fillNeedle ? `도안을 연결하고 바늘 호수를 ${linked.needleSize}로 채웠어요.` : '도안을 연결했어요.');
+        render();
+      });
+    }
+
+    const unlinkRavelryBtn = root.querySelector('[data-action="unlink-ravelry"]');
+    if (unlinkRavelryBtn) {
+      unlinkRavelryBtn.addEventListener('click', async () => {
+        const ok = await Modal.confirm({
+          title: 'Ravelry 링크를 해제할까요?',
+          message: 'Favorites에 찜해둔 도안은 그대로 남아요.',
+          okLabel: '해제',
+          cancelLabel: '취소',
+        });
+        if (!ok) return;
+        Storage.updateProject(id, { ravelryPattern: null });
+        showBanner('Ravelry 링크를 해제했어요.');
         render();
       });
     }

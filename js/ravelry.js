@@ -185,6 +185,12 @@ const Ravelry = (() => {
     return { items: detailed, hasMore: page < (paginator.last_page || paginator.page_count || page) };
   }
 
+  // 도안 하나의 바늘 굵기만 다시 가져오기 (예전에 찜해서 바늘 정보가 없는 Favorites 채우기용)
+  async function getPatternNeedles(id) {
+    const d = await request(`/patterns/${id}.json`);
+    return formatNeedles((d.pattern || {}).pattern_needle_sizes);
+  }
+
   function errorMessage(err) {
     switch (err && err.code) {
       case 'offline':
@@ -199,5 +205,5 @@ const Ravelry = (() => {
     }
   }
 
-  return { isConfigured, testConnection, searchYarns, getYarnDetail, searchPatterns, errorMessage, PATTERN_TYPES };
+  return { isConfigured, testConnection, searchYarns, getYarnDetail, searchPatterns, getPatternNeedles, errorMessage, PATTERN_TYPES };
 })();
