@@ -1,75 +1,142 @@
-# 뜨개 다이어리
+<div align="center">
 
-뜨개 작품, 실, 도안, 단수를 한곳에서 기록하는 개인용 웹앱이에요.
-태블릿·폰 브라우저에서 열고 **홈 화면에 추가**하면 앱처럼 쓸 수 있어요(PWA). 서버 없이 기기 안에 데이터를 저장해요.
+# 🧶 뜨개 다이어리
 
-**바로 쓰기:** https://seungaeahn.github.io/k_web/
+**뜨고 있는 작품, 실, 도안, 단수를 한곳에.**<br>
+뜨개하는 사람이 쓰려고 직접 만든, 모눈종이 위 십자수 같은 뜨개 기록 앱이에요.
 
-## 주요 기능
+### 👉 [지금 바로 열기](https://seungaeahn.github.io/k_web/)
 
-### Projects
-- 작품을 **CO Waiting List → WIP → FO** 단계로 관리해요.
-  - CO Waiting List: 코를 잡기 전, 뜰 예정인 작품
-  - WIP: 뜨고 있는 작품 (Cast On 하면 시작일이 기록돼요)
-  - FO: 완성한 작품 (Archive로 모여요)
-- 작품 상세: 대표 사진, 진행 기간, 연결한 도안·실, 메모, 진행 사진
-- WIP 작품은 **Open Pattern**으로 바로 도안을 열 수 있어요.
-- FO 작품에는 인스타그램 게시글 링크를 붙여 앱 안에서 같이 볼 수 있어요.
+회원가입 없음 · 무료 · 데이터는 내 기기에만 저장
 
-### Patterns
-- **Library**: 이미지·PDF 도안을 올려두고 앱 안 뷰어로 봐요.
-  - 하이라이트 줄로 지금 뜨는 단을 표시 (색 5가지, 두께 조절)
-  - **단수 카운터**를 추가하면 +1 할 때마다 하이라이트 줄이 한 칸 위로 올라가요
-- **Favorites**: Ravelry에서 찜한 도안
-- **Search**: Ravelry 도안 검색 → 하트로 찜, **Start Project**로 바로 작품 시작
-- 도안에서 작품을 시작하면 이름·바늘이 채워지고 도안이 자동으로 연결돼요.
+</div>
 
-### Yarn
-- 실 보관함: 색상, 굵기(Lace ~ Super Bulky), 권장 바늘, 소재, 보유량
-- 보유량 단위는 **볼** 또는 **g(콘사)** 중에 골라요.
-- 작품에 실을 연결할 때는 보유량이 줄지 않고, **FO로 바꿀 때 실제로 쓴 양을 기록**해요.
-  - g 단위 실은 남은 무게를 저울에 재서 적으면 쓴 양을 계산해요.
-- Ravelry에서 실 정보를 불러와 굵기·소재·권장 바늘을 채울 수 있어요.
-- "이 실로 뜰 도안 찾기"로 Ravelry 도안을 추천받아요.
+<p align="center">
+  <img src="docs/screenshots/projects.png" width="23%" alt="작품 목록">
+  <img src="docs/screenshots/detail.png" width="23%" alt="작품 상세">
+  <img src="docs/screenshots/viewer.png" width="23%" alt="도안 보며 단수 세기">
+  <img src="docs/screenshots/search.png" width="23%" alt="Ravelry 도안 검색">
+</p>
 
-### Tools
-- **Gauge Calculator**: 스와치 게이지로 필요한 코·단 수 계산
-- **Abbreviations**: 뜨개 약어 사전
-- **Backup**: 데이터 내보내기·가져오기 (도안 파일, Favorites 포함)
-- **Ravelry**: Ravelry API 연동 설정
+---
 
-## 아이패드·폰에서 앱처럼 쓰기
+## 이런 분께 좋아요
 
-1. **Safari**에서 https://seungaeahn.github.io/k_web/ 을 열어요. (아이패드·아이폰은 꼭 Safari)
-2. 공유 버튼 → **홈 화면에 추가** → 추가
-3. 이후에는 홈 화면 아이콘으로 열어요. 주소창 없이 전체 화면으로 열리고, 인터넷이 없어도 열려요.
+- 뜨고 있는 작품이 여러 개라 **어디까지 떴는지** 자꾸 헷갈리는 분
+- 도안을 보면서 **지금 몇 단째인지** 손으로 세기 번거로운 분
+- 실은 쌓여 가는데 **뭐가 얼마나 남았는지** 모르겠는 분
+- Ravelry에서 찜한 도안을 **바로 작품으로 시작**하고 싶은 분
 
-> 안드로이드는 Chrome 메뉴 → **앱 설치** (또는 홈 화면에 추가)
+## 3단계로 시작하기
 
-## 데이터와 백업
+**1. 열기**
+아이패드·아이폰은 **Safari**로, 안드로이드는 Chrome으로 👉 https://seungaeahn.github.io/k_web/
 
-- 모든 데이터는 **그 기기의 브라우저 안**에만 저장돼요 (localStorage, 도안 파일은 IndexedDB). 다른 기기와 자동으로 맞춰지지 않아요.
-- Safari 탭과 홈 화면 앱은 데이터를 **따로** 저장해요. 홈 화면 앱으로 쓰는 걸 추천해요.
-  - iOS Safari는 오래 방문하지 않은 웹사이트의 데이터를 지울 수 있는데, 홈 화면 앱은 예외예요.
-  - 앱은 시작할 때 브라우저에 지속 저장소를 요청해요. 상태는 Tools > Backup에서 확인할 수 있어요.
-- **Tools > Backup**에서 가끔 백업 파일을 내보내 iCloud Drive나 구글 드라이브에 보관해 두세요.
-  - 백업에는 작품, 실, 도안(파일 포함 선택), Favorites, 약어, 설정이 들어가요.
-  - Ravelry API 키는 백업에 넣지 않아요.
-  - 가져오기는 지금 데이터를 백업 내용으로 **덮어써요.**
+**2. 홈 화면에 추가하기** (꼭 해주세요!)
+- 아이패드·아이폰: 공유 버튼 <kbd>⬆️</kbd> → **홈 화면에 추가** → 추가
+- 안드로이드: Chrome 메뉴 <kbd>⋮</kbd> → **앱 설치**
 
-## Ravelry 연동
+이제 홈 화면 아이콘으로 열면 주소창 없이 앱처럼 열리고, 인터넷이 없어도 쓸 수 있어요.
 
-Ravelry 실·도안 검색을 쓰려면 개인용 API 키가 필요해요.
+**3. 첫 작품 만들기**
+Projects 탭에서 **+ New Project**를 누르거나, Patterns 탭에서 도안을 고르고 **Start Project**를 누르면 돼요.
+
+---
+
+## 이렇게 써요
+
+### 🧶 작품은 CO → WIP → FO로
+| 단계 | 뜻 | 앱에서는 |
+| --- | --- | --- |
+| **CO Waiting List** | 코를 잡기 전, 뜰 예정 | 뜨고 싶은 작품을 모아두는 목록. **Cast On**을 누르면 시작! |
+| **WIP** | 뜨는 중 | **Open Pattern**으로 바로 도안을 열고 단수를 세요 |
+| **FO** | 완성 | 쓴 실의 양을 기록하고 Archive에 모여요. 인스타그램 게시글도 붙일 수 있어요 |
+
+### 📄 도안을 보면서 단수 세기
+- 이미지나 PDF 도안을 올려두고 앱 안에서 봐요.
+- 지금 뜨는 단에 **하이라이트 줄**을 놓아요. (색 5가지, 두께 조절)
+- **+ Row Counter**로 단수 카운터를 켜면, **+1**을 누를 때마다 줄이 한 칸 위로 올라가요. 뜨개 차트는 아래에서 위로 읽으니까요!
+- 화면이 꺼지지 않게 해둬서 뜨는 동안 계속 볼 수 있어요.
+
+### 💛 Ravelry 도안 찾기 → 바로 시작
+- Patterns › **Search**에서 Ravelry 도안을 검색하고 하트로 찜해요.
+- **Start Project**를 누르면 작품 이름, 바늘, 도안이 채워진 채로 새 작품이 만들어져요.
+- 바늘 굵기와 필요한 실 양도 같이 보여줘요.
+
+### 🧵 실 보관함
+- 실마다 색, 굵기(Lace ~ Super Bulky), 권장 바늘, 소재, 보유량을 적어둬요.
+- 보유량은 **볼**로도, **g(콘사)**로도 관리할 수 있어요.
+- 작품에 실을 연결해두고, **다 뜨고 나서 쓴 양을 기록**해요. 콘사는 남은 무게를 저울에 올려 적기만 하면 쓴 양을 계산해줘요.
+- "이 실로 뜰 도안 찾기"로 갖고 있는 실에 맞는 Ravelry 도안을 추천받아요.
+
+### 🛠 Tools
+- **Gauge Calculator**: 스와치 게이지로 필요한 코 수·단 수 계산
+- **Abbreviations**: k2tog, ssk 같은 뜨개 약어 사전
+- **Backup**: 데이터 내보내기·가져오기
+- **Ravelry**: Ravelry 연동 설정
+
+---
+
+## 자주 묻는 질문
+
+<details>
+<summary><b>내 데이터는 어디에 저장되나요?</b></summary>
+
+지금 쓰고 있는 **기기의 브라우저 안**에만 저장돼요. 서버로 보내지 않고, 다른 사람이 볼 수 없어요.
+대신 기기끼리 자동으로 맞춰지지 않아요. 아이패드와 폰은 각각 따로 저장돼요.
+</details>
+
+<details>
+<summary><b>데이터가 사라질 수도 있나요?</b></summary>
+
+이럴 때는 사라질 수 있어요.
+- Safari에서 방문 기록·웹사이트 데이터를 지울 때
+- 기기를 초기화하거나 바꿀 때
+- **홈 화면에 추가하지 않고** Safari 탭으로만 오래 안 쓸 때 (iOS가 7일 넘게 안 쓴 웹사이트 데이터를 지울 수 있어요)
+
+그래서 **홈 화면에 추가해서 쓰고**, 가끔 **Tools › Backup**에서 백업 파일을 내보내 iCloud Drive나 구글 드라이브에 보관해 두세요. 30일 동안 백업을 안 하면 앱이 알려줘요.
+</details>
+
+<details>
+<summary><b>다른 기기로 옮기고 싶어요.</b></summary>
+
+1. 쓰던 기기에서 **Tools › Backup › Export Data**로 백업 파일을 저장해요.
+2. 새 기기에서 앱을 열고 **Tools › Backup › Choose Backup File**로 그 파일을 골라요.
+
+가져오기를 하면 새 기기에 있던 데이터는 백업 내용으로 **바뀌어요.** 도안 파일, 찜한 도안까지 같이 옮겨져요.
+</details>
+
+<details>
+<summary><b>Ravelry 연동은 꼭 해야 하나요?</b></summary>
+
+아니요, **선택**이에요. 작품, 실, 도안 파일, 단수 카운터는 연동 없이도 다 쓸 수 있어요.
+Ravelry 도안 검색·찜, 실 정보 불러오기를 쓰고 싶을 때만 설정하면 돼요.
 
 1. [Ravelry 개발자 페이지](https://www.ravelry.com/pro/developer)에서 **읽기 전용(read-only)** 개인 키를 발급받아요.
-2. 앱의 **Tools > Ravelry**에 API 액세스 키와 API 시크릿을 넣고 **Test Connection**으로 확인해요.
+2. 앱의 **Tools › Ravelry**에 API 액세스 키와 API 시크릿을 넣고 **Test Connection**을 눌러요.
 
-키와 시크릿은 그 기기에만 저장되고 Ravelry API 호출에만 쓰여요.
-이 앱은 Ravelry에서 만들거나 제휴·보증한 앱이 아니에요.
+키는 내 기기에만 저장되고, 백업 파일에도 들어가지 않아요.
+</details>
 
-## 개발
+<details>
+<summary><b>굿노트로 도안을 보는데 같이 쓸 수 있나요?</b></summary>
 
-빌드 도구 없이 순수 HTML·CSS·JavaScript로 만들었어요.
+아이패드 **화면 분할(Split View)**로 굿노트와 이 앱을 나란히 띄워 보세요. 도안은 굿노트에서 보고, 단수와 작품 기록은 이 앱에서 하면 돼요.
+</details>
+
+<details>
+<summary><b>앱 스토어에서 받을 수 있나요?</b></summary>
+
+스토어 앱은 아니에요. 대신 **홈 화면에 추가**하면 스토어 앱처럼 아이콘으로 열리고, 오프라인에서도 동작해요. 새 버전은 인터넷이 될 때 알아서 받아서, 다음에 열 때 반영돼요.
+</details>
+
+---
+
+<details>
+<summary><b>🧑‍💻 개발자용 정보</b></summary>
+
+### 만든 방식
+빌드 도구 없이 순수 HTML·CSS·JavaScript로 만든 PWA예요.
 
 ```bash
 # 로컬에서 실행 (Node.js 필요)
@@ -81,14 +148,13 @@ node scripts/serve.js 8080
 - 코드를 바꾸면 `sw.js`의 `CACHE_NAME` 버전을 올려야 설치된 앱에도 새 버전이 반영돼요.
 
 ### 폴더 구조
-
 ```
 index.html            앱 화면 틀, 하단 탭
 manifest.webmanifest  홈 화면 앱 설정 (이름, 아이콘, 색)
 sw.js                 서비스 워커 (오프라인 캐시)
 css/style.css         디자인 토큰과 전체 스타일
 css/MUNMAK_DALBANCHE.ttf  영어 제목·버튼용 글꼴
-js/app.js             화면(라우터, 각 화면 그리기, 이벤트)
+js/app.js             화면 (라우터, 각 화면 그리기, 이벤트)
 js/storage.js         데이터 저장·백업 (localStorage)
 js/filestore.js       도안 파일 저장 (IndexedDB)
 js/ravelry.js         Ravelry API
@@ -97,11 +163,13 @@ js/modal.js           팝업, 고르기 창
 js/utils.js           날짜·문자열 도우미
 vendor/pdfjs/         PDF 도안 표시 (pdf.js 3.11.174)
 scripts/              로컬 서버, 아이콘 생성
+docs/screenshots/     README 화면 캡처
 ```
 
 ### 디자인
-
-- 버터 바탕, 실타래 갈색, 슬레이트 블루 십자수 색을 쓰는 "모눈종이" 디자인 시스템 (`css/style.css` 맨 위 토큰)
-- 본문: [Pretendard](https://github.com/orioncactus/pretendard)
-- 영어 제목·버튼: 문막 달반체
+- 버터 바탕, 실타래 갈색, 슬레이트 블루 십자수 색의 "모눈종이" 디자인 시스템 (`css/style.css` 맨 위 토큰)
+- 본문: [Pretendard](https://github.com/orioncactus/pretendard) · 영어 제목·버튼: 문막 달반체
 - 빈 화면·썸네일의 십자수 그림은 `js/icons.js`의 칸 배열(`STITCHES`)로 그려요.
+</details>
+
+<sub>이 앱은 Ravelry에서 만들거나 제휴·보증한 앱이 아니에요. Ravelry 검색 결과는 Ravelry API로 가져와요.</sub>

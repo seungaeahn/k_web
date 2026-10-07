@@ -724,3 +724,11 @@ label.btn { cursor: pointer; }
 .gauge-result-item span { font-size: var(--fs-body); font-weight: 700; color: var(--text-2); }
 .gauge-result-x { font-size: 22px; color: var(--text-3); padding-bottom: 4px; }
 .gauge-result .card-meta { margin: var(--s-2) 0 0; }
+
+/* 도안 뷰어 단수 버튼은 숫자가 잘 보이게 굵은 본문 글꼴 */
+.viewer-counter .btn { font-family: var(--font); font-weight: 700; letter-spacing: 0; }
+.viewer-counter .viewer-plus { font-size: 22px; }
+
+/* 연결 항목: 좁으면 버튼이 다음 줄로 (이름이 꺾이지 않게) */
+.link-item { flex-wrap: wrap; }
+.link-item-main { flex: 1 1 140px; }
