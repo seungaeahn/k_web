@@ -902,6 +902,10 @@ const App = (() => {
         <h1 class="display-title">Backup</h1>
       </header>
       <div class="info-block backup-card">
+        <h3>저장소 보호</h3>
+        <p class="card-meta" id="persist-status">확인 중...</p>
+      </div>
+      <div class="info-block backup-card">
         <h3>내보내기</h3>
         <p class="card-meta">작품, 실, 도안, Favorites, 약어를 백업 파일(.json)로 저장해요. 마지막 백업: ${settings.lastBackupAt ? Utils.formatDateTime(settings.lastBackupAt) : '아직 없어요'}</p>
         <label class="field checkbox">
@@ -926,6 +930,17 @@ const App = (() => {
     `;
 
     root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+
+    requestPersistentStorage().then((persisted) => {
+      const el = root.querySelector('#persist-status');
+      if (!el) return;
+      const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      el.textContent = persisted === true
+        ? '켜짐 · 브라우저가 이 앱의 데이터를 임의로 지우지 않아요.'
+        : persisted === false
+          ? `꺼짐 · 저장공간이 부족하면 브라우저가 데이터를 지울 수 있어요.${standalone ? '' : ' 홈 화면에 추가해서 쓰면 더 안전해요.'} 백업을 꼭 해두세요.`
+          : `이 브라우저는 저장소 보호를 지원하지 않아요.${standalone ? '' : ' 홈 화면에 추가해서 쓰면 더 안전해요.'} 백업을 꼭 해두세요.`;
+    });
 
     root.querySelector('[data-action="export"]').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
@@ -2813,6 +2828,20 @@ const App = (() => {
   }
 
   // ---------- Init ----------
+  // ---------- Persistent storage ----------
+  // 데이터가 이 기기에만 있으므로, 브라우저가 저장공간이 부족하거나 오래 안 썼을 때
+  // 사이트 데이터를 지우지 않도록 "지속 저장소"를 요청함. 결과: true(보호됨) / false / null(지원 안 함)
+  async function requestPersistentStorage() {
+    try {
+      if (!navigator.storage || !navigator.storage.persist) return null;
+      if (await navigator.storage.persisted()) return true;
+      return await navigator.storage.persist();
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  }
+
   function init() {
     window.addEventListener('hashchange', render);
     // 시간 기록 기능을 없애면서, 예전에 진행 중이던 기록 상태가 남아 있으면 비움
@@ -2820,6 +2849,7 @@ const App = (() => {
     render();
     checkBackupReminder();
     registerServiceWorker();
+    requestPersistentStorage();
   }
 
   return { init };
