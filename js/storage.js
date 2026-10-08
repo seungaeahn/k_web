@@ -44,9 +44,17 @@ const Storage = (() => {
     { term: 'gauge', desc: '게이지, 정해진 크기당 코 수와 단 수' },
   ];
 
+  // 데모 모드에서는 실제 기록을 건드리지 않게 메모리에만 저장
+  const store = Utils.isDemo
+    ? (() => {
+      const mem = new Map();
+      return { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
+    })()
+    : window.localStorage;
+
   function read(key, fallback) {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = store.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
     } catch (e) {
       console.error('storage read failed', key, e);
@@ -56,7 +64,7 @@ const Storage = (() => {
 
   function write(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      store.setItem(key, JSON.stringify(value));
       return true;
     } catch (e) {
       console.error('storage write failed', key, e);
@@ -544,7 +552,7 @@ const Storage = (() => {
   }
   function setActiveSession(session) {
     if (session === null) {
-      localStorage.removeItem(KEYS.activeSession);
+      store.removeItem(KEYS.activeSession);
     } else {
       write(KEYS.activeSession, session);
     }
@@ -555,7 +563,7 @@ const Storage = (() => {
     return read(KEYS.lastAction, null);
   }
   function setLastAction(action) {
-    if (action === null) localStorage.removeItem(KEYS.lastAction);
+    if (action === null) store.removeItem(KEYS.lastAction);
     else write(KEYS.lastAction, action);
   }
 

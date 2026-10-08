@@ -82,7 +82,13 @@ const Utils = (() => {
       .replace(/"/g, '&quot;');
   }
 
+  // 데모 모드: 주소에 ?demo (전부 채운 상태) 또는 ?demo=half (절반쯤) 를 붙여 열면
+  // 실제 기록 대신 메모리에 목업 데이터를 띄움 (js/demo.js). 창을 닫으면 사라짐
+  const demoParam = new URLSearchParams(location.search).get('demo');
+  const demoMode = demoParam === null ? null : (demoParam === 'half' ? 'half' : 'full');
+
   return {
+    isDemo: !!demoMode, demoMode,
     uid, todayStr, dateToStr, toDateTimeLocal, formatDate, formatDateTime,
     formatDuration, isSameDay, debounce, fileToBase64, escapeHtml,
   };

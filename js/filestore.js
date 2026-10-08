@@ -46,5 +46,14 @@ const FileStore = (() => {
     });
   }
 
+  // 데모 모드: 도안 파일도 메모리에만
+  if (Utils.isDemo) {
+    const mem = new Map();
+    return {
+      put: async (id, blob) => { mem.set(id, blob); },
+      get: async (id) => mem.get(id) || null,
+      remove: async (id) => { mem.delete(id); },
+    };
+  }
   return { put, get, remove };
 })();

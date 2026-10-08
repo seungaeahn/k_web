@@ -402,6 +402,11 @@ const App = (() => {
     const touched = prog.list.filter((x) => x.start < prog.stitches && x.start + x.sampler.total > beforeStitches);
     const finished = touched.filter((x) => x.done);
     const it = finished.length ? finished[finished.length - 1] : touched[touched.length - 1];
+    if (!it) {
+      // 샘플러를 모두 완성한 뒤: 땀 수만 알려줌
+      showBanner(`이번 작품으로 ${ballText(grams)}을 수놓았어요. +${gained}땀`);
+      return;
+    }
     const s = it.sampler;
     const newFrom = Math.max(0, beforeStitches - it.start);
     const c = finished.length ? Characters.get(s.id) : null;

@@ -151,6 +151,7 @@ node scripts/serve.js 8080
 
 - `master` 브랜치에 푸시하면 GitHub Pages에 자동으로 배포돼요.
 - 코드를 바꾸면 `sw.js`의 `CACHE_NAME` 버전을 올려야 설치된 앱에도 새 버전이 반영돼요.
+- 주소 끝에 `?demo`(샘플러 전부 완성)나 `?demo=half`(진행 중)를 붙이면 목업 데이터로 열려요. 메모리에만 저장돼서 실제 기록은 건드리지 않아요.
 
 ### 폴더 구조
 ```
@@ -167,6 +168,7 @@ js/icons.js           실루엣 아이콘, 십자수 그림·숫자
 js/modal.js           팝업, 고르기 창
 js/sampler.js         십자수 샘플러 (도안, 땀 계산)
 js/characters.js      뜨개 친구 캐릭터 (임시 SVG, 손그림 PNG로 교체 가능)
+js/demo.js            데모 모드 목업 데이터
 js/utils.js           날짜·문자열 도우미
 vendor/pdfjs/         PDF 도안 표시 (pdf.js 3.11.174)
 scripts/              로컬 서버, 아이콘 생성
