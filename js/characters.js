@@ -184,5 +184,18 @@ const Characters = (() => {
     </svg>`;
   }
 
-  return { CHARACTERS, get, render, ensureFilters };
+  // 다른 SVG 장면 안에 바로 그려 넣기 (x, y: 왼쪽 위, size: 가로세로)
+  function inline(id, x, y, size) {
+    const c = get(id);
+    if (!c) return '';
+    if (c.image) {
+      return `<image href="${c.image}" x="${x}" y="${y}" width="${size}" height="${size}"/>`;
+    }
+    ensureFilters();
+    return `<svg class="char is-blinking" x="${x}" y="${y}" width="${size}" height="${size}" viewBox="0 0 100 100" overflow="visible">
+      <g filter="url(#kw-hand)" stroke="${LINE}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">${c.body()}</g>
+    </svg>`;
+  }
+
+  return { CHARACTERS, get, render, inline, ensureFilters };
 })();

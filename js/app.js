@@ -47,6 +47,7 @@ const App = (() => {
     if (parts.length === 0) return { name: 'list', params: {} };
     if (parts[0] === 'archive') {
       if (parts[1] === 'sampler') return { name: 'sampler-album', params: {} };
+      if (parts[1] === 'gallery') return { name: 'archive', params: { tab: 'gallery' } };
       return { name: 'archive', params: {} };
     }
     if (parts[0] === 'yarn') {
@@ -101,7 +102,7 @@ const App = (() => {
 
     switch (route.name) {
       case 'list': return renderList();
-      case 'archive': return renderArchive();
+      case 'archive': return renderArchive(route.params.tab);
       case 'sampler-album': return renderSamplerAlbum();
       case 'project-form': return renderProjectForm(route.params.id, route.params.from);
       case 'project-detail': return renderProjectDetail(route.params.id);
@@ -196,7 +197,9 @@ const App = (() => {
   }
 
   // ---------- View: Archive ----------
-  function renderArchive() {
+  // Archive 탭: Jar(실타래 유리병 + 친구들) / Gallery(완성작 사진첩)
+  function renderArchive(tab) {
+    tab = tab === 'gallery' ? 'gallery' : 'jar';
     setActiveTab('archive');
     const projects = Storage.getProjects()
       .filter((p) => p.status === 'completed')
@@ -204,56 +207,34 @@ const App = (() => {
 
     root.innerHTML = `
       <header class="page-header"><h1>Archive</h1></header>
-      ${samplerSummaryCard()}
-      ${projects.length ? `<h2 class="section-head">FO ${projects.length}</h2>` : ''}
-      <div class="grid-2 archive-grid">
-        ${projects.length === 0 ? emptyState('완성한 작품이 아직 없어요', '작품을 완성하면 여기에 모여요.') : projects.map(archiveCard).join('')}
+      <div class="status-row" id="archive-tab-switch">
+        <button type="button" class="chip display-chip ${tab === 'jar' ? 'active' : ''}" data-tab="jar">Jar</button>
+        <button type="button" class="chip display-chip ${tab === 'gallery' ? 'active' : ''}" data-tab="gallery">Gallery</button>
       </div>
+      ${tab === 'jar' ? archiveHero(projects) : `
+        ${projects.length ? `<h2 class="section-head">FO ${projects.length}</h2>` : ''}
+        <div class="grid-2 archive-grid">
+          ${projects.length === 0 ? emptyState('완성한 작품이 아직 없어요', '작품을 완성하면 여기에 모여요.') : projects.map(archiveCard).join('')}
+        </div>`}
     `;
+    root.querySelector('#archive-tab-switch').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-tab]');
+      if (btn) go(btn.dataset.tab === 'gallery' ? '#/archive/gallery' : '#/archive');
+    });
     root.querySelectorAll('[data-project-id]').forEach((el) => {
       el.addEventListener('click', () => go(`#/project/${el.dataset.projectId}`));
     });
-    root.querySelector('[data-sampler-album]').addEventListener('click', () => go('#/archive/sampler'));
-    bindFriends(root);
+    if (tab === 'jar') {
+      root.querySelector('[data-sampler-album]').addEventListener('click', () => go('#/archive/sampler'));
+      bindJar(root);
+    }
   }
 
   // ---------- 십자수 샘플러 + 뜨개 친구 ----------
-  // 샘플러를 다 채우면 같은 id의 캐릭터가 튀어나와 Archive의 바구니에 모여 앉음
+  // 샘플러를 다 채우면 같은 id의 캐릭터가 튀어나와 Archive의 실타래 유리병 속에 들어감
   const ballText = (grams) => `${Sampler.fmt(grams / Sampler.GRAMS_PER_BALL)}볼`;
   const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const prefersReducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const BASKET_SVG = `
-    <svg class="basket" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true">
-      <g filter="url(#kw-hand)" stroke="#4A1F18" stroke-width="2.4" stroke-linejoin="round" vector-effect="non-scaling-stroke">
-        <path d="M8 10 H312 L296 57 H24 Z" fill="#E9C77E" vector-effect="non-scaling-stroke"/>
-        <path d="M13 26 H307 M17 40 H303 M21 52 H299" fill="none" stroke="#C99F4F" stroke-width="2" vector-effect="non-scaling-stroke"/>
-        <path d="${Array.from({ length: 19 }, (_, i) => `M${24 + i * 15} 16 v38`).join(' ')}" fill="none" stroke="#C99F4F" stroke-width="1.6" stroke-dasharray="6 6" vector-effect="non-scaling-stroke"/>
-        <rect x="2" y="3" width="316" height="13" rx="6.5" fill="#F2D594" vector-effect="non-scaling-stroke"/>
-      </g>
-    </svg>`;
-
-  // 완성한 친구들이 바구니에 모여 앉은 장면
-  function friendsBasket(prog) {
-    Characters.ensureFilters();
-    const friends = prog.list.filter((it) => it.done);
-    const friendBtn = (it, i) => `
-      <button type="button" class="friend" data-friend="${it.sampler.id}" style="--d:${((i * 0.73) % 3).toFixed(2)}s;--blink:${((i * 1.7) % 4.6).toFixed(2)}s" aria-label="${Utils.escapeHtml(Characters.get(it.sampler.id).name)}">
-        ${Characters.render(it.sampler.id)}
-      </button>`;
-    // 5명이 넘으면 나중에 온 친구들은 뒷줄에 앉음
-    const front = friends.slice(0, 5);
-    const back = friends.slice(5);
-    return `
-      <div class="friends-basket">
-        ${back.length ? `<div class="friends-row is-back">${back.map((it, i) => friendBtn(it, i + 5)).join('')}</div>` : ''}
-        <div class="friends-row">
-          ${front.length ? front.map(friendBtn).join('') : '<p class="friends-empty">첫 샘플러를 다 채우면<br>친구가 바구니에 들어와요.</p>'}
-        </div>
-        ${BASKET_SVG}
-        <p class="friend-bubble" hidden></p>
-      </div>`;
-  }
 
   // 친구를 누르면 내 기록으로 한마디
   function friendLine(id) {
@@ -275,40 +256,88 @@ const App = (() => {
     return pickOne(lines);
   }
 
-  function bindFriends(scope) {
-    const basket = scope.querySelector('.friends-basket');
-    if (!basket) return;
-    const bubble = basket.querySelector('.friend-bubble');
+  // 작품에 쓴 실: "8볼 · 크림 아란 울" 처럼 짧게
+  function projectYarnText(p) {
+    const grams = Sampler.projectGrams(p);
+    const names = (p.yarns || []).map((l) => l.yarnName).filter(Boolean);
+    return [grams ? `${ballText(grams)} (${Sampler.fmt(grams)}g)` : '실 기록 없음', names.join(', ')].filter(Boolean).join(' · ');
+  }
+
+  // 유리병의 실타래·친구를 누르면 말풍선
+  function bindJar(scope) {
+    const pile = scope.querySelector('.jar-scene');
+    if (!pile) return;
+    const bubble = pile.querySelector('.scene-bubble');
     let timer = null;
-    basket.querySelectorAll('[data-friend]').forEach((el) => {
+    const show = (html, anchor) => {
+      bubble.innerHTML = html;
+      bubble.hidden = false;
+      const box = pile.getBoundingClientRect();
+      const r = anchor.getBoundingClientRect();
+      const half = bubble.offsetWidth / 2;
+      const center = r.left - box.left + r.width / 2;
+      bubble.style.left = `${Math.min(pile.clientWidth - half - 4, Math.max(half + 4, center))}px`;
+      bubble.style.top = `${Math.max(0, r.top - box.top - bubble.offsetHeight - 4)}px`;
+      clearTimeout(timer);
+      timer = setTimeout(() => { bubble.hidden = true; }, 4000);
+    };
+    pile.querySelectorAll('[data-friend]').forEach((el) => {
       el.addEventListener('click', () => {
         el.classList.remove('is-hop');
-        void el.offsetWidth;
+        el.getBoundingClientRect();
         el.classList.add('is-hop');
-        bubble.textContent = friendLine(el.dataset.friend);
-        bubble.hidden = false;
-        const half = bubble.offsetWidth / 2;
-        const center = el.offsetLeft + el.offsetWidth / 2;
-        bubble.style.left = `${Math.min(basket.clientWidth - half - 8, Math.max(half + 8, center))}px`;
-        bubble.style.top = `${Math.max(4, el.offsetTop - bubble.offsetHeight + 6)}px`;
-        clearTimeout(timer);
-        timer = setTimeout(() => { bubble.hidden = true; }, 3600);
+        show(Utils.escapeHtml(friendLine(el.dataset.friend)), el);
       });
+    });
+    pile.querySelectorAll('[data-fo-id]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const p = Storage.getProject(el.dataset.foId);
+        if (!p) return;
+        pile.querySelectorAll('.jar-ball.is-picked').forEach((x) => x.classList.remove('is-picked'));
+        el.classList.add('is-picked');
+        show(`
+          <strong>${Utils.escapeHtml(p.name)}</strong>
+          <span>${Utils.formatDate(p.completedDate)} · ${Utils.escapeHtml(projectYarnText(p))}</span>
+          <button type="button" class="text-btn" data-open-fo="${p.id}">Open ›</button>`, el);
+      });
+    });
+    bubble.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-open-fo]');
+      if (btn) go(`#/project/${btn.dataset.openFo}`);
+    });
+    // 실타래·친구가 아닌 곳(유리, 뚜껑)을 누르면 병이 흔들림
+    const jarSvg = pile.querySelector('.jar-svg');
+    jarSvg.addEventListener('click', (e) => {
+      if (e.target.closest('[data-fo-id], [data-friend]')) return;
+      bubble.hidden = true;
+      YarnJar.shake(jarSvg);
     });
   }
 
-  function samplerSummaryCard() {
+  // 양 한 마리에서 나오는 털실 ≈ 2.5kg (재미로 보여주는 비교)
+  const SHEEP_GRAMS = 2500;
+
+  function archiveHero(projects) {
     const prog = Sampler.progress();
     const cur = prog.current;
+    const friends = prog.list.filter((it) => it.done).map((it) => ({ id: it.sampler.id, date: it.completedDate }));
+    const kg = prog.grams / 1000;
+    const sheep = prog.grams / SHEEP_GRAMS;
     return `
-      <section class="sampler-home">
-        ${friendsBasket(prog)}
+      <section class="jar-home">
+        <div class="jar-stats">
+          <div class="jar-stat"><strong>${projects.length}</strong><span>FO</span></div>
+          <div class="jar-stat"><strong>${Sampler.fmt(prog.grams / Sampler.GRAMS_PER_BALL)}</strong><span>볼</span></div>
+          <div class="jar-stat"><strong>${kg >= 1 ? Sampler.fmt(kg) : Math.round(prog.grams)}</strong><span>${kg >= 1 ? 'kg' : 'g'}</span></div>
+        </div>
+        ${sheep >= 0.5 ? `<p class="jar-caption">양 ${Sampler.fmt(sheep)}마리 분량의 털을 떴어요</p>` : ''}
+        ${YarnJar.render(projects, friends)}
         <button type="button" class="sampler-progress" data-sampler-album>
           ${cur ? `<span class="sampler-progress-art">${Sampler.svg(cur.sampler, { filled: cur.filled, numbers: false })}</span>` : ''}
           <span class="sampler-progress-body">
             <span class="sampler-kicker">Sampler${cur ? ` · Chapter ${cur.sampler.chapter}` : ''}</span>
             <strong>${cur ? `${cur.filled} / ${cur.sampler.total}땀` : '모든 친구를 만났어요!'}</strong>
-            <span class="card-meta">${cur ? `다음 땀까지 ${Sampler.fmt(prog.gramsToNext)}g · ` : ''}지금까지 ${ballText(prog.grams)}</span>
+            <span class="card-meta">${cur ? `다음 땀까지 ${Sampler.fmt(prog.gramsToNext)}g · 다 채우면 누군가 튀어나와요` : `친구 ${friends.length}명이 유리병 속에서 놀고 있어요`}</span>
           </span>
           <span class="sampler-summary-go" aria-hidden="true">›</span>
         </button>
@@ -420,7 +449,7 @@ const App = (() => {
         </div>
         ${c
           ? `<p class="friend-hello pop-hello" data-pop-hello>“${Utils.escapeHtml(c.hello)}”</p>
-             <p class="card-meta pop-hello" data-pop-hello>${finished.length > 1 ? `친구 ${finished.length}명이 한꺼번에 나왔어요! ` : ''}Archive 바구니에서 기다릴게요.</p>`
+             <p class="card-meta pop-hello" data-pop-hello>${finished.length > 1 ? `친구 ${finished.length}명이 한꺼번에 나왔어요! ` : ''}Archive 유리병 속에서 기다릴게요.</p>`
           : `<p class="card-meta">${it.filled} / ${s.total}땀 · 다음 땀까지 ${Sampler.fmt(prog.gramsToNext)}g</p>`}`,
       buttons: [{ id: 'ok', label: 'OK', variant: 'primary' }],
     });

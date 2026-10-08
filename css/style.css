@@ -754,8 +754,8 @@ span.char { position: relative; }
 .has-blink-img .char-img.is-blink { animation: char-blink-img 4.6s infinite; animation-delay: var(--blink, 0s); }
 @keyframes char-blink-img { 0%, 93%, 98%, 100% { opacity: 0; } 94%, 97% { opacity: 1; } }
 
-/* Archive: 바구니에 모인 친구들 + 지금 수놓는 샘플러 */
-.sampler-home {
+/* Archive: 실타래 유리병 + 곁에서 노는 친구들 + 지금 수놓는 샘플러 */
+.jar-home {
   margin-bottom: var(--s-4); overflow: hidden;
   border: var(--outline); border-radius: var(--r-l); box-shadow: var(--shadow);
   background-color: var(--surface);
@@ -764,27 +764,37 @@ span.char { position: relative; }
     linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 12px 12px;
 }
-.friends-basket { position: relative; padding: 44px var(--s-3) 0; }
-.friends-row {
-  position: relative; z-index: 1; display: flex; justify-content: center; align-items: flex-end;
-  min-height: 60px; margin-bottom: -16px;
+.jar-stats { display: flex; justify-content: center; gap: var(--s-4); padding: var(--s-3) var(--s-3) 0; }
+.jar-stat { display: flex; align-items: baseline; gap: 3px; }
+.jar-stat strong { font-family: var(--font-display); font-weight: 400; font-size: 30px; line-height: 1; }
+.jar-stat span { font-size: 13px; font-weight: 700; color: var(--text-2); }
+.jar-caption { margin: 6px 0 0; text-align: center; font-size: var(--fs-sub); color: var(--text-2); }
+.jar-scene { position: relative; width: min(100% - 32px, 380px); margin: var(--s-3) auto 0; }
+.jar-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.jar-ball { cursor: pointer; }
+.jar-ball.is-picked circle { stroke-width: 3.4; }
+.jar-friend { transform-box: fill-box; }
+.jar-empty { position: absolute; left: 0; right: 0; top: 52%; margin: 0; text-align: center; font-size: var(--fs-sub); color: var(--text-2); }
+.jar-shelf { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: var(--s-1) var(--s-2); padding: 0 var(--s-3) var(--s-2); }
+.jar-mini { display: flex; flex-direction: column; align-items: center; width: 54px; font-size: 12px; color: var(--text-2); }
+.jar-mini svg { width: 100%; height: auto; }
+.jar-shelf .card-meta { flex-basis: 100%; margin: 0; text-align: center; }
+.scene-bubble {
+  position: absolute; z-index: 3; transform: translateX(-50%); width: max-content; max-width: min(260px, 90%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 12px; font-size: 13px; line-height: 1.4; text-align: center; color: var(--text);
+  background: var(--surface); border: var(--outline); border-radius: 12px; box-shadow: var(--shadow);
 }
-.friends-row.is-back { z-index: 0; margin: 0 8% -46px; }
-.friends-row.is-back .friend { flex-basis: 78px; }
+.scene-bubble strong { font-size: 14px; }
+.scene-bubble span { color: var(--text-2); }
+.scene-bubble .text-btn { padding: 2px 0 0; }
 .friend {
-  flex: 0 1 88px; min-width: 0; padding: 0; margin: 0 -3px; background: none; border: 0; cursor: pointer;
+  padding: 0; background: none; border: 0; cursor: pointer;
   transform-origin: bottom center; animation: friend-bob 3.2s ease-in-out infinite; animation-delay: calc(var(--d, 0s) * -1);
 }
 .friend.is-hop { animation: friend-hop .5s ease-out; }
 @keyframes friend-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-2deg); } }
 @keyframes friend-hop { 0% { transform: translateY(0); } 35% { transform: translateY(-14px) rotate(4deg); } 70% { transform: translateY(0) scale(1.05, .95); } 100% { transform: none; } }
-.friends-empty { margin: 0 0 36px; text-align: center; font-size: var(--fs-sub); color: var(--text-2); }
-.basket { position: relative; z-index: 2; display: block; width: 100%; height: 44px; }
-.friend-bubble {
-  position: absolute; z-index: 3; transform: translateX(-50%); width: max-content; max-width: min(240px, 80%);
-  margin: 0; padding: 6px 10px; font-size: 13px; line-height: 1.4; color: var(--text);
-  background: var(--surface); border: var(--outline); border-radius: 12px; box-shadow: var(--shadow);
-}
 .sampler-progress {
   display: flex; align-items: center; gap: var(--s-2); width: 100%; padding: var(--s-2) var(--s-3);
   text-align: left; color: inherit; font: inherit; cursor: pointer;
@@ -864,3 +874,4 @@ span.char { position: relative; }
   padding: 2px 10px; font-family: var(--font-display); font-size: 13px; color: var(--on-accent);
   background: var(--accent); border-radius: var(--r-full); opacity: .9;
 }
+.jar-svg { cursor: pointer; -webkit-tap-highlight-color: transparent; }
