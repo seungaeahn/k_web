@@ -52,6 +52,11 @@ Projects 탭에서 **+ New Project**를 누르거나, Patterns 탭에서 도안�
 | **WIP** | 뜨는 중 | **Open Pattern**으로 바로 도안을 열고 단수를 세요 |
 | **FO** | 완성 | 쓴 실의 양을 기록하고 Archive에 모여요. 인스타그램 게시글도 붙일 수 있어요 |
 
+### 🪡 십자수 샘플러
+- FO에 쓴 실을 기록하면 **50g(1볼) = 5땀**씩 샘플러에 수놓아져요. 볼 단위 실은 볼당 무게로, 콘사는 g 그대로 계산해요.
+- 차트처럼 아래 단부터 한 땀씩 채워지고, 다 채우면 숨어 있던 **뜨개 친구**가 튀어나와요.
+- 친구들은 **Archive**의 바구니에 모여 앉아 있고, 누르면 내 기록으로 말을 걸어요. 완성한 날짜와 이야기는 **Sampler Album**에서 볼 수 있어요. 장(Chapter)이 넘어갈수록 모눈이 커져요.
+
 ### 📄 도안을 보면서 단수 세기
 - 이미지나 PDF 도안을 올려두고 앱 안에서 봐요.
 - 지금 뜨는 단에 **하이라이트 줄**을 놓아요. (색 5가지, 두께 조절)
@@ -160,6 +165,8 @@ js/filestore.js       도안 파일 저장 (IndexedDB)
 js/ravelry.js         Ravelry API
 js/icons.js           실루엣 아이콘, 십자수 그림·숫자
 js/modal.js           팝업, 고르기 창
+js/sampler.js         십자수 샘플러 (도안, 땀 계산)
+js/characters.js      뜨개 친구 캐릭터 (임시 SVG, 손그림 PNG로 교체 가능)
 js/utils.js           날짜·문자열 도우미
 vendor/pdfjs/         PDF 도안 표시 (pdf.js 3.11.174)
 scripts/              로컬 서버, 아이콘 생성

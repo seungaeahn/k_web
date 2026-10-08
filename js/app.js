@@ -45,7 +45,10 @@ const App = (() => {
     const hash = location.hash.replace(/^#/, '') || '/';
     const parts = hash.split('/').filter(Boolean);
     if (parts.length === 0) return { name: 'list', params: {} };
-    if (parts[0] === 'archive') return { name: 'archive', params: {} };
+    if (parts[0] === 'archive') {
+      if (parts[1] === 'sampler') return { name: 'sampler-album', params: {} };
+      return { name: 'archive', params: {} };
+    }
     if (parts[0] === 'yarn') {
       if (parts[1] === 'new') return { name: 'yarn-form', params: {} };
       if (parts[1]) return { name: 'yarn-form', params: { id: parts[1] } };
@@ -99,6 +102,7 @@ const App = (() => {
     switch (route.name) {
       case 'list': return renderList();
       case 'archive': return renderArchive();
+      case 'sampler-album': return renderSamplerAlbum();
       case 'project-form': return renderProjectForm(route.params.id, route.params.from);
       case 'project-detail': return renderProjectDetail(route.params.id);
       case 'yarn-list': return renderYarnList();
@@ -200,6 +204,7 @@ const App = (() => {
 
     root.innerHTML = `
       <header class="page-header"><h1>Archive</h1></header>
+      ${samplerSummaryCard()}
       ${projects.length ? `<h2 class="section-head">FO ${projects.length}</h2>` : ''}
       <div class="grid-2 archive-grid">
         ${projects.length === 0 ? emptyState('완성한 작품이 아직 없어요', '작품을 완성하면 여기에 모여요.') : projects.map(archiveCard).join('')}
@@ -208,6 +213,225 @@ const App = (() => {
     root.querySelectorAll('[data-project-id]').forEach((el) => {
       el.addEventListener('click', () => go(`#/project/${el.dataset.projectId}`));
     });
+    root.querySelector('[data-sampler-album]').addEventListener('click', () => go('#/archive/sampler'));
+    bindFriends(root);
+  }
+
+  // ---------- 십자수 샘플러 + 뜨개 친구 ----------
+  // 샘플러를 다 채우면 같은 id의 캐릭터가 튀어나와 Archive의 바구니에 모여 앉음
+  const ballText = (grams) => `${Sampler.fmt(grams / Sampler.GRAMS_PER_BALL)}볼`;
+  const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const prefersReducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const BASKET_SVG = `
+    <svg class="basket" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true">
+      <g filter="url(#kw-hand)" stroke="#4A1F18" stroke-width="2.4" stroke-linejoin="round" vector-effect="non-scaling-stroke">
+        <path d="M8 10 H312 L296 57 H24 Z" fill="#E9C77E" vector-effect="non-scaling-stroke"/>
+        <path d="M13 26 H307 M17 40 H303 M21 52 H299" fill="none" stroke="#C99F4F" stroke-width="2" vector-effect="non-scaling-stroke"/>
+        <path d="${Array.from({ length: 19 }, (_, i) => `M${24 + i * 15} 16 v38`).join(' ')}" fill="none" stroke="#C99F4F" stroke-width="1.6" stroke-dasharray="6 6" vector-effect="non-scaling-stroke"/>
+        <rect x="2" y="3" width="316" height="13" rx="6.5" fill="#F2D594" vector-effect="non-scaling-stroke"/>
+      </g>
+    </svg>`;
+
+  // 완성한 친구들이 바구니에 모여 앉은 장면
+  function friendsBasket(prog) {
+    Characters.ensureFilters();
+    const friends = prog.list.filter((it) => it.done);
+    const friendBtn = (it, i) => `
+      <button type="button" class="friend" data-friend="${it.sampler.id}" style="--d:${((i * 0.73) % 3).toFixed(2)}s;--blink:${((i * 1.7) % 4.6).toFixed(2)}s" aria-label="${Utils.escapeHtml(Characters.get(it.sampler.id).name)}">
+        ${Characters.render(it.sampler.id)}
+      </button>`;
+    // 5명이 넘으면 나중에 온 친구들은 뒷줄에 앉음
+    const front = friends.slice(0, 5);
+    const back = friends.slice(5);
+    return `
+      <div class="friends-basket">
+        ${back.length ? `<div class="friends-row is-back">${back.map((it, i) => friendBtn(it, i + 5)).join('')}</div>` : ''}
+        <div class="friends-row">
+          ${front.length ? front.map(friendBtn).join('') : '<p class="friends-empty">첫 샘플러를 다 채우면<br>친구가 바구니에 들어와요.</p>'}
+        </div>
+        ${BASKET_SVG}
+        <p class="friend-bubble" hidden></p>
+      </div>`;
+  }
+
+  // 친구를 누르면 내 기록으로 한마디
+  function friendLine(id) {
+    const c = Characters.get(id);
+    const prog = Sampler.progress();
+    const projects = Storage.getProjects();
+    const fo = projects.filter((p) => p.status === 'completed').length;
+    const wip = projects.filter((p) => p.status === 'active');
+    const yarns = Storage.getYarns().filter((y) => y.amount > 0);
+    const lines = [c.hello];
+    if (fo) lines.push(`FO가 벌써 ${fo}개야! 대단해.`);
+    if (prog.grams) lines.push(`지금까지 ${ballText(prog.grams)}을 떴어. 털실 산이야!`);
+    if (wip.length) lines.push(`'${pickOne(wip).name}' 잘 되고 있어? 천천히 해.`);
+    if (yarns.length) {
+      const y = pickOne(yarns);
+      lines.push(`${y.name}, 아직 ${formatYarnAmount(y.amount, yarnUnitOf(y))} 남았더라.`);
+    }
+    if (prog.current) lines.push(`다음 친구까지 ${prog.current.sampler.total - prog.current.filled}땀 남았어. 누굴까?`);
+    return pickOne(lines);
+  }
+
+  function bindFriends(scope) {
+    const basket = scope.querySelector('.friends-basket');
+    if (!basket) return;
+    const bubble = basket.querySelector('.friend-bubble');
+    let timer = null;
+    basket.querySelectorAll('[data-friend]').forEach((el) => {
+      el.addEventListener('click', () => {
+        el.classList.remove('is-hop');
+        void el.offsetWidth;
+        el.classList.add('is-hop');
+        bubble.textContent = friendLine(el.dataset.friend);
+        bubble.hidden = false;
+        const half = bubble.offsetWidth / 2;
+        const center = el.offsetLeft + el.offsetWidth / 2;
+        bubble.style.left = `${Math.min(basket.clientWidth - half - 8, Math.max(half + 8, center))}px`;
+        bubble.style.top = `${Math.max(4, el.offsetTop - bubble.offsetHeight + 6)}px`;
+        clearTimeout(timer);
+        timer = setTimeout(() => { bubble.hidden = true; }, 3600);
+      });
+    });
+  }
+
+  function samplerSummaryCard() {
+    const prog = Sampler.progress();
+    const cur = prog.current;
+    return `
+      <section class="sampler-home">
+        ${friendsBasket(prog)}
+        <button type="button" class="sampler-progress" data-sampler-album>
+          ${cur ? `<span class="sampler-progress-art">${Sampler.svg(cur.sampler, { filled: cur.filled, numbers: false })}</span>` : ''}
+          <span class="sampler-progress-body">
+            <span class="sampler-kicker">Sampler${cur ? ` · Chapter ${cur.sampler.chapter}` : ''}</span>
+            <strong>${cur ? `${cur.filled} / ${cur.sampler.total}땀` : '모든 친구를 만났어요!'}</strong>
+            <span class="card-meta">${cur ? `다음 땀까지 ${Sampler.fmt(prog.gramsToNext)}g · ` : ''}지금까지 ${ballText(prog.grams)}</span>
+          </span>
+          <span class="sampler-summary-go" aria-hidden="true">›</span>
+        </button>
+      </section>`;
+  }
+
+  function samplerCard(it, isCurrent) {
+    const s = it.sampler;
+    if (!it.done && !isCurrent) {
+      return `
+        <div class="sampler-card is-locked">
+          <div class="sampler-card-art"><span class="sampler-lock">?</span></div>
+          <p class="sampler-card-name">?</p>
+          <p class="card-meta">${s.size}×${s.size} · ${s.total}땀</p>
+        </div>`;
+    }
+    return `
+      <button type="button" class="sampler-card ${it.done ? 'is-done' : 'is-current'}" data-sampler-id="${s.id}">
+        <div class="sampler-card-art">${it.done ? Characters.render(s.id, { blink: false }) : Sampler.svg(s, { filled: it.filled, numbers: false })}</div>
+        <p class="sampler-card-name">${it.done ? Utils.escapeHtml(Characters.get(s.id).name) : 'Stitching…'}</p>
+        <p class="card-meta">${it.done ? (it.completedDate ? Utils.formatDate(it.completedDate) : '완성') : `${it.filled} / ${s.total}땀`}</p>
+      </button>`;
+  }
+
+  function renderSamplerAlbum() {
+    setActiveTab('archive');
+    const prog = Sampler.progress();
+    const chapters = [...new Set(Sampler.SAMPLERS.map((s) => s.chapter))];
+    root.innerHTML = `
+      <header class="page-header with-back">
+        <button class="icon-btn" data-action="back">←</button>
+        <h1 class="display-title">Sampler Album</h1>
+      </header>
+      <div class="sampler-intro">
+        <p>FO에 쓴 실을 기록하면 샘플러에 한 땀씩 수놓아져요. 다 채우면 숨어 있던 뜨개 친구가 튀어나와요.</p>
+        <p class="card-meta">${Sampler.GRAMS_PER_BALL}g = 1볼 = ${Sampler.STITCHES_PER_BALL}땀 · 지금까지 ${ballText(prog.grams)}(${Sampler.fmt(prog.grams)}g), ${prog.stitches}땀</p>
+      </div>
+      ${chapters.map((ch) => {
+        const items = prog.list.filter((it) => it.sampler.chapter === ch);
+        const size = items[0].sampler.size;
+        return `
+          <h2 class="section-head">Chapter ${ch}</h2>
+          <p class="card-meta sampler-chapter-meta">${size}×${size} 모눈</p>
+          <div class="sampler-grid-list">
+            ${items.map((it) => samplerCard(it, prog.current && prog.current.index === it.index)).join('')}
+          </div>`;
+      }).join('')}
+    `;
+    root.querySelector('[data-action="back"]').addEventListener('click', () => history.back());
+    root.querySelectorAll('[data-sampler-id]').forEach((el) => {
+      el.addEventListener('click', () => openSamplerModal(el.dataset.samplerId));
+    });
+  }
+
+  function openSamplerModal(samplerId) {
+    const it = Sampler.progress().list.find((x) => x.sampler.id === samplerId);
+    if (!it) return;
+    const s = it.sampler;
+    const c = Characters.get(s.id);
+    if (!it.done) {
+      Modal.open({
+        title: 'Stitching…',
+        bodyHtml: `
+          <div class="sampler-view">${Sampler.svg(s, { filled: it.filled })}</div>
+          <p class="card-meta">${it.filled} / ${s.total}땀 · 다 채우면 누군가 튀어나와요.</p>`,
+        buttons: [{ id: 'ok', label: 'Close', variant: 'primary' }],
+      });
+      return;
+    }
+    Modal.open({
+      title: Utils.escapeHtml(c.name),
+      bodyHtml: `
+        <div class="friend-hero">${Characters.render(s.id)}</div>
+        <p class="friend-hello">“${Utils.escapeHtml(c.hello)}”</p>
+        <p>${Utils.escapeHtml(c.story)}</p>
+        <div class="friend-origin">
+          <div class="friend-origin-art">${Sampler.svg(s, { numbers: false })}</div>
+          <p class="card-meta">${it.completedDate ? `${Utils.formatDate(it.completedDate)}, ` : ''}${s.total}땀으로 수놓은 ${Utils.escapeHtml(c.kind)}</p>
+        </div>`,
+      buttons: [{ id: 'ok', label: 'Close', variant: 'primary' }],
+    });
+  }
+
+  // FO에 실 사용량이 기록된 뒤: 이번 작품으로 늘어난 땀을 보여주고, 샘플러를 다 채웠으면 친구가 튀어나옴
+  async function showSamplerGain(projectId, beforeStitches) {
+    const prog = Sampler.progress();
+    const gained = prog.stitches - beforeStitches;
+    const project = Storage.getProject(projectId);
+    if (!project || project.status !== 'completed' || gained <= 0) return;
+    const grams = Sampler.projectGrams(project);
+    const touched = prog.list.filter((x) => x.start < prog.stitches && x.start + x.sampler.total > beforeStitches);
+    const finished = touched.filter((x) => x.done);
+    const it = finished.length ? finished[finished.length - 1] : touched[touched.length - 1];
+    const s = it.sampler;
+    const newFrom = Math.max(0, beforeStitches - it.start);
+    const c = finished.length ? Characters.get(s.id) : null;
+    const pending = Modal.open({
+      title: c ? 'Sampler Complete!' : 'Stitched!',
+      bodyHtml: `
+        <p>이번 작품으로 <strong>${ballText(grams)}</strong>을 수놓았어요. <strong>+${gained}땀</strong></p>
+        <div class="sampler-pop" data-sampler-pop>
+          ${Sampler.svg(s, { filled: it.filled, newFrom })}
+          ${c ? `<div class="pop-sparks" aria-hidden="true">${'<i></i>'.repeat(8)}</div><div class="pop-char">${Characters.render(s.id)}</div>` : ''}
+        </div>
+        ${c
+          ? `<p class="friend-hello pop-hello" data-pop-hello>“${Utils.escapeHtml(c.hello)}”</p>
+             <p class="card-meta pop-hello" data-pop-hello>${finished.length > 1 ? `친구 ${finished.length}명이 한꺼번에 나왔어요! ` : ''}Archive 바구니에서 기다릴게요.</p>`
+          : `<p class="card-meta">${it.filled} / ${s.total}땀 · 다음 땀까지 ${Sampler.fmt(prog.gramsToNext)}g</p>`}`,
+      buttons: [{ id: 'ok', label: 'OK', variant: 'primary' }],
+    });
+    if (c) {
+      const popEl = document.querySelector('[data-sampler-pop]');
+      const titleEl = popEl && popEl.closest('.modal').querySelector('.modal-title');
+      const reveal = () => {
+        if (!popEl || !popEl.isConnected) return;
+        popEl.classList.add('is-popped');
+        if (titleEl) titleEl.textContent = `${c.name} 등장!`;
+        document.querySelectorAll('[data-pop-hello]').forEach((el) => el.classList.add('is-shown'));
+      };
+      if (prefersReducedMotion()) reveal();
+      else setTimeout(reveal, Math.min(2400, (it.filled - newFrom) * 60) + 700);
+    }
+    await pending;
   }
 
   // 인스타그램 게시글 주소 → { url, embed } (게시물 /p/, 릴스 /reel/, /tv/ 지원)
@@ -2635,7 +2859,11 @@ const App = (() => {
 
     root.querySelectorAll('[data-record-yarn]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        if (await openYarnUsageModal(id, [btn.dataset.recordYarn])) render();
+        const stitchesBefore = Sampler.progress().stitches;
+        if (await openYarnUsageModal(id, [btn.dataset.recordYarn])) {
+          await showSamplerGain(id, stitchesBefore);
+          render();
+        }
       });
     });
 
@@ -2759,14 +2987,16 @@ const App = (() => {
       return;
     }
     if (status === 'completed') {
+      const stitchesBefore = Sampler.progress().stitches;
       Storage.updateProject(project.id, { status, completedDate: Utils.todayStr() });
       const pendingYarnIds = (project.yarns || []).filter((l) => l.pending && Storage.getYarn(l.yarnId)).map((l) => l.yarnId);
       if (pendingYarnIds.length) {
         await openYarnUsageModal(project.id, pendingYarnIds, {
           title: 'FO 축하해요!',
-          intro: '이 작품에 쓴 실 양을 기록하면 실 보관함 보유량이 맞춰져요.',
+          intro: '이 작품에 쓴 실 양을 기록하면 실 보관함 보유량이 맞춰지고, 샘플러에 땀이 수놓아져요.',
         });
       }
+      await showSamplerGain(project.id, stitchesBefore);
       showBanner('FO로 옮겼어요. Archive에서 볼 수 있어요.');
       go('#/archive');
       return;

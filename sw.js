@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kw-cache-v121';
+const CACHE_NAME = 'kw-cache-v123';
 const APP_SHELL = [
   './',
   './index.html',
@@ -11,6 +11,8 @@ const APP_SHELL = [
   './js/storage.js',
   './js/ravelry.js',
   './js/modal.js',
+  './js/sampler.js',
+  './js/characters.js',
   './js/app.js',
   './vendor/pdfjs/pdf.min.js',
   './vendor/pdfjs/pdf.worker.min.js',

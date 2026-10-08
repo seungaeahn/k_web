@@ -732,3 +732,128 @@ label.btn { cursor: pointer; }
 /* 연결 항목: 좁으면 버튼이 다음 줄로 (이름이 꺾이지 않게) */
 .link-item { flex-wrap: wrap; }
 .link-item-main { flex: 1 1 140px; }
+
+/* 십자수 샘플러 */
+.sampler-svg { display: block; width: 100%; height: auto; }
+.sampler-grid line { stroke: var(--grid); stroke-width: .6; }
+.sampler-grid line.is-strong { stroke-width: 1.1; }
+.sampler-nums text { font-size: 6px; fill: var(--text-3); font-variant-numeric: tabular-nums; }
+.sampler-stitches .is-new { opacity: 0; animation: stitch-in .35s ease-out forwards; }
+@keyframes stitch-in { from { opacity: 0; transform: scale(.4); transform-box: fill-box; transform-origin: center; } to { opacity: 1; transform: scale(1); transform-box: fill-box; transform-origin: center; } }
+
+/* 뜨개 친구 (캐릭터) */
+.char { display: block; width: 100%; height: auto; overflow: visible; }
+.char .char-blush { fill: #F2A7A7; opacity: .75; stroke: none; }
+.char .char-eyes { stroke: none; }
+.char .char-mouth, .char .char-closed { fill: none; stroke-width: 1.6; }
+.char.is-blinking .char-eyes { transform-box: fill-box; transform-origin: center; animation: char-blink 4.6s infinite; animation-delay: var(--blink, 0s); }
+@keyframes char-blink { 0%, 93%, 100% { transform: scaleY(1); } 95%, 97% { transform: scaleY(.1); } }
+span.char { position: relative; }
+.char-img { display: block; width: 100%; height: auto; }
+.char-img.is-blink { position: absolute; inset: 0; opacity: 0; }
+.has-blink-img .char-img.is-blink { animation: char-blink-img 4.6s infinite; animation-delay: var(--blink, 0s); }
+@keyframes char-blink-img { 0%, 93%, 98%, 100% { opacity: 0; } 94%, 97% { opacity: 1; } }
+
+/* Archive: 바구니에 모인 친구들 + 지금 수놓는 샘플러 */
+.sampler-home {
+  margin-bottom: var(--s-4); overflow: hidden;
+  border: var(--outline); border-radius: var(--r-l); box-shadow: var(--shadow);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.friends-basket { position: relative; padding: 44px var(--s-3) 0; }
+.friends-row {
+  position: relative; z-index: 1; display: flex; justify-content: center; align-items: flex-end;
+  min-height: 60px; margin-bottom: -16px;
+}
+.friends-row.is-back { z-index: 0; margin: 0 8% -46px; }
+.friends-row.is-back .friend { flex-basis: 78px; }
+.friend {
+  flex: 0 1 88px; min-width: 0; padding: 0; margin: 0 -3px; background: none; border: 0; cursor: pointer;
+  transform-origin: bottom center; animation: friend-bob 3.2s ease-in-out infinite; animation-delay: calc(var(--d, 0s) * -1);
+}
+.friend.is-hop { animation: friend-hop .5s ease-out; }
+@keyframes friend-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-2deg); } }
+@keyframes friend-hop { 0% { transform: translateY(0); } 35% { transform: translateY(-14px) rotate(4deg); } 70% { transform: translateY(0) scale(1.05, .95); } 100% { transform: none; } }
+.friends-empty { margin: 0 0 36px; text-align: center; font-size: var(--fs-sub); color: var(--text-2); }
+.basket { position: relative; z-index: 2; display: block; width: 100%; height: 44px; }
+.friend-bubble {
+  position: absolute; z-index: 3; transform: translateX(-50%); width: max-content; max-width: min(240px, 80%);
+  margin: 0; padding: 6px 10px; font-size: 13px; line-height: 1.4; color: var(--text);
+  background: var(--surface); border: var(--outline); border-radius: 12px; box-shadow: var(--shadow);
+}
+.sampler-progress {
+  display: flex; align-items: center; gap: var(--s-2); width: 100%; padding: var(--s-2) var(--s-3);
+  text-align: left; color: inherit; font: inherit; cursor: pointer;
+  background: var(--surface); border: 0; border-top: var(--border-w) dashed var(--text-3);
+}
+.sampler-progress-art { flex: 0 0 52px; }
+.sampler-progress-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sampler-progress-body strong { font-size: var(--fs-body); }
+.sampler-kicker { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--label); }
+.sampler-summary-go { font-size: 28px; color: var(--text-3); }
+
+/* Sampler Album */
+.sampler-intro { margin-bottom: var(--s-4); }
+.sampler-intro p { margin: 0 0 4px; }
+.sampler-chapter-meta { margin: calc(-1 * var(--s-1)) 0 var(--s-2); }
+.sampler-grid-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); margin-bottom: var(--s-4); }
+@media (min-width: 900px) { .sampler-grid-list { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.sampler-card {
+  display: flex; flex-direction: column; gap: 2px; padding: var(--s-1); text-align: center; color: inherit; font: inherit;
+  background: var(--surface); border: var(--outline); border-radius: var(--r-l); box-shadow: var(--shadow); cursor: pointer;
+}
+.sampler-card.is-current { border-style: dashed; box-shadow: none; }
+.sampler-card.is-locked { border: var(--lace); box-shadow: none; cursor: default; }
+.sampler-card-art { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.sampler-card-art .sampler-svg, .sampler-card-art .char { width: 100%; }
+.sampler-lock { font-family: var(--font-display); font-size: 40px; color: var(--text-3); }
+.sampler-card-name { margin: 0; font-family: var(--font-display); font-size: 16px; line-height: 1.2; }
+.sampler-card .card-meta { margin: 0; font-size: 12px; }
+.sampler-view { max-width: 280px; margin: var(--s-2) auto; }
+
+/* 친구 소개 팝업 */
+.friend-hero { width: 160px; margin: 0 auto var(--s-1); }
+.friend-hello {
+  position: relative; margin: var(--s-2) auto; padding: var(--s-1) var(--s-2); max-width: 300px; text-align: center;
+  background: var(--surface); border: var(--outline); border-radius: 14px; font-weight: 600;
+}
+.friend-origin { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); padding-top: var(--s-2); border-top: var(--border-w) dashed var(--text-3); }
+.friend-origin-art { flex: 0 0 56px; }
+.friend-origin .card-meta { margin: 0; }
+
+/* 샘플러 완성: 땀이 들리며 친구가 튀어나옴 */
+.sampler-pop { position: relative; max-width: 280px; margin: var(--s-2) auto; }
+.sampler-pop .sampler-svg { transition: opacity .5s, transform .5s, filter .5s; }
+.sampler-pop.is-popped .sampler-svg { opacity: .15; transform: scale(.9); filter: blur(1px); }
+.pop-char { position: absolute; left: 50%; top: 50%; width: 72%; opacity: 0; transform: translate(-50%, -50%) scale(0); pointer-events: none; }
+.sampler-pop.is-popped .pop-char { animation: char-pop .8s cubic-bezier(.2, 1.5, .4, 1) forwards; }
+@keyframes char-pop {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.2) rotate(-12deg); }
+  60% { opacity: 1; transform: translate(-50%, -58%) scale(1.08) rotate(4deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+}
+.pop-sparks i { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px; opacity: 0; }
+.pop-sparks i::before, .pop-sparks i::after { content: ""; position: absolute; left: 5px; top: -1px; width: 2.5px; height: 14px; border-radius: 2px; background: var(--accent); transform: rotate(45deg); }
+.pop-sparks i::after { transform: rotate(-45deg); }
+.pop-sparks i:nth-child(1) { --a: 0deg; } .pop-sparks i:nth-child(2) { --a: 45deg; }
+.pop-sparks i:nth-child(3) { --a: 90deg; } .pop-sparks i:nth-child(4) { --a: 135deg; }
+.pop-sparks i:nth-child(5) { --a: 180deg; } .pop-sparks i:nth-child(6) { --a: 225deg; }
+.pop-sparks i:nth-child(7) { --a: 270deg; } .pop-sparks i:nth-child(8) { --a: 315deg; }
+.pop-sparks i:nth-child(odd)::before, .pop-sparks i:nth-child(odd)::after { background: #B5452F; }
+.sampler-pop.is-popped .pop-sparks i { animation: spark .8s ease-out forwards; }
+@keyframes spark {
+  0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(.5); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(-130px) scale(1); }
+}
+.pop-hello { opacity: 0; transform: translateY(6px); transition: opacity .4s .5s, transform .4s .5s; }
+.pop-hello.is-shown { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .friend, .char .char-eyes, .sampler-stitches .is-new, .pop-sparks i { animation: none !important; }
+  .sampler-stitches .is-new { opacity: 1; }
+  .sampler-pop.is-popped .pop-char { animation: none; opacity: 1; transform: translate(-50%, -50%); }
+}
