@@ -12,6 +12,9 @@ const YarnJar = (() => {
   // 병 크기 (viewBox 단위)
   const JAR = { left: 50, right: 250, lidY: 30, neckY: 52, shoulderY: 74, bottom: 344, ground: 352 };
   const H = 364;
+  // 화면에 보여줄 범위: 병 둘레만 (양옆·위 여백을 잘라 병이 폭을 꽉 채우게)
+  const VIEW = { x: JAR.left - 14, y: JAR.lidY - 16, w: JAR.right - JAR.left + 28, h: H - (JAR.lidY - 16) };
+  const VIEWBOX = `${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`;
   const INNER = { left: JAR.left + 4, right: JAR.right - 4, top: JAR.shoulderY + 2, floor: JAR.bottom - 4 };
 
   // ---- 색 ----
@@ -165,8 +168,8 @@ const YarnJar = (() => {
     const current = jars[jars.length - 1];
     const full = jars.slice(0, -1);
     return `
-      <div class="jar-scene" style="aspect-ratio:${W} / ${H}">
-        <svg class="jar-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="완성한 작품 ${projects.length}개의 실타래와 친구 ${friends.length}명이 든 유리병">
+      <div class="jar-scene">
+        <svg class="jar-svg" viewBox="${VIEWBOX}" role="img" aria-label="완성한 작품 ${projects.length}개의 실타래와 친구 ${friends.length}명이 든 유리병">
           ${jarSvg(current)}
         </svg>
         ${items.length ? '' : '<p class="jar-empty">첫 FO를 완성하면<br>실타래가 하나 들어와요.</p>'}
@@ -176,7 +179,7 @@ const YarnJar = (() => {
         <div class="jar-shelf">
           ${full.map((contents, i) => `
             <div class="jar-mini">
-              <svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${jarSvg(contents, { id: `full${i}` })}</svg>
+              <svg viewBox="${VIEWBOX}" aria-hidden="true">${jarSvg(contents, { id: `full${i}` })}</svg>
               <span>${i + 1}병</span>
             </div>`).join('')}
           <p class="card-meta">가득 찬 병 ${full.length}개 · 지금 ${full.length + 1}번째 병을 채우는 중</p>

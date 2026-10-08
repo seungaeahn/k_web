@@ -201,6 +201,8 @@ const App = (() => {
   function renderArchive(tab) {
     tab = tab === 'gallery' ? 'gallery' : 'jar';
     setActiveTab('archive');
+    // Jar 탭은 화면 높이에 맞춰 스크롤 없이 (css: [data-archive-tab="jar"])
+    document.body.dataset.archiveTab = tab;
     const projects = Storage.getProjects()
       .filter((p) => p.status === 'completed')
       .sort((a, b) => new Date(b.completedDate || 0) - new Date(a.completedDate || 0));
@@ -325,13 +327,15 @@ const App = (() => {
     const sheep = prog.grams / SHEEP_GRAMS;
     return `
       <section class="jar-home">
+        <div class="jar-top">
         <div class="jar-stats">
           <div class="jar-stat"><strong>${projects.length}</strong><span>FO</span></div>
           <div class="jar-stat"><strong>${Sampler.fmt(prog.grams / Sampler.GRAMS_PER_BALL)}</strong><span>볼</span></div>
           <div class="jar-stat"><strong>${kg >= 1 ? Sampler.fmt(kg) : Math.round(prog.grams)}</strong><span>${kg >= 1 ? 'kg' : 'g'}</span></div>
         </div>
         ${sheep >= 0.5 ? `<p class="jar-caption">양 ${Sampler.fmt(sheep)}마리 분량의 털을 떴어요</p>` : ''}
-        ${YarnJar.render(projects, friends)}
+        </div>
+        <div class="jar-stage">${YarnJar.render(projects, friends)}</div>
         <button type="button" class="sampler-progress" data-sampler-album>
           ${cur ? `<span class="sampler-progress-art">${Sampler.svg(cur.sampler, { filled: cur.filled, numbers: false })}</span>` : ''}
           <span class="sampler-progress-body">
