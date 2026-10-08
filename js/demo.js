@@ -1,7 +1,8 @@
 // 데모 모드 목업 데이터 (?demo = 샘플러 전부 완성, ?demo=half = 2장 진행 중)
 // Storage/FileStore가 메모리를 쓰는 상태에서만 실행되므로 실제 기록에는 영향 없음
 (() => {
-  if (!Utils.isDemo) return;
+  // 저장소가 정말 메모리를 쓸 때만 채움 (옛 캐시 파일과 섞여도 실제 기록에 들어가지 않게)
+  if (!Utils.isDemo || !Storage.usesMemory || !FileStore.usesMemory) return;
   const full = Utils.demoMode === 'full';
   const daysAgo = (n) => Utils.dateToStr(new Date(Date.now() - n * 86400000));
 

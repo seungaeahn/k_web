@@ -53,6 +53,7 @@ const FileStore = (() => {
       put: async (id, blob) => { mem.set(id, blob); },
       get: async (id) => mem.get(id) || null,
       remove: async (id) => { mem.delete(id); },
+      usesMemory: true,
     };
   }
   return { put, get, remove };

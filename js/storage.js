@@ -568,6 +568,7 @@ const Storage = (() => {
   }
 
   return {
+    usesMemory: store !== window.localStorage,
     getProjects, saveProjects, getProject, createProject, updateProject, touchProject, deleteProject,
     getCounters, getCountersByProject, createCounter, updateCounter, deleteCounter,
     getSessions, getSessionsByProject, addSession, updateSession, deleteSession,
