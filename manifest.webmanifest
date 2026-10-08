@@ -1,6 +1,6 @@
 {
-  "name": "뜨개 다이어리",
-  "short_name": "뜨개 다이어리",
+  "name": "실실 SilSil",
+  "short_name": "실실",
   "description": "뜨개 작품, 실, 도안, 단수를 기록하는 개인용 앱",
   "start_url": "./index.html",
   "scope": "./",

@@ -193,7 +193,8 @@ const YarnJar = (() => {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const wobble = svg.querySelector('.jar-wobble');
     if (!wobble) return;
-    cancelAnimationFrame(shaking.get(svg));
+    const prev = shaking.get(svg);
+    if (prev) { cancelAnimationFrame(prev.raf); clearTimeout(prev.timer); }
     const items = [...svg.querySelectorAll('.jar-shake')].map((el) => {
       const friend = el.classList.contains('is-friend');
       const cx = Number(el.dataset.cx);
@@ -211,7 +212,13 @@ const YarnJar = (() => {
     const start = performance.now();
     const DUR = 1600;
     const pivot = `${W / 2} ${JAR.ground}`;
-    const frame = (now) => {
+    const settle = () => {
+      wobble.removeAttribute('transform');
+      items.forEach((it) => it.el.removeAttribute('transform'));
+    };
+    const state = {};
+    const frame = () => {
+      const now = performance.now();
       const t = (now - start) / 1000;
       const decay = Math.exp(-t * 3);
       const tilt = 6 * decay * Math.sin(t * 13);
@@ -224,14 +231,13 @@ const YarnJar = (() => {
         const rot = it.spin * d * Math.sin(p * 0.9);
         it.el.setAttribute('transform', `translate(${dx.toFixed(2)} ${dy.toFixed(2)}) rotate(${rot.toFixed(2)} ${it.cx} ${it.cy})`);
       });
-      if (now - start < DUR) {
-        shaking.set(svg, requestAnimationFrame(frame));
-      } else {
-        wobble.removeAttribute('transform');
-        items.forEach((it) => it.el.removeAttribute('transform'));
-      }
+      if (now - start < DUR) state.raf = requestAnimationFrame(frame);
+      else settle();
     };
-    shaking.set(svg, requestAnimationFrame(frame));
+    state.raf = requestAnimationFrame(frame);
+    // 화면 갱신이 멈춰도(백그라운드로 보냈을 때 등) 끝나면 반드시 제자리로
+    state.timer = setTimeout(() => { cancelAnimationFrame(state.raf); settle(); }, DUR + 150);
+    shaking.set(svg, state);
   }
 
   return { render, colorsOf, shake };

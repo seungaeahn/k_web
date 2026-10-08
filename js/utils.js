@@ -84,8 +84,9 @@ const Utils = (() => {
 
   // 데모 모드: 주소에 ?demo (전부 채운 상태) 또는 ?demo=half (절반쯤) 를 붙여 열면
   // 실제 기록 대신 메모리에 목업 데이터를 띄움 (js/demo.js). 창을 닫으면 사라짐
+  // ?demo=test 는 자동 테스트용: 메모리 저장소만 쓰고 목업 데이터는 채우지 않음 (tests/)
   const demoParam = new URLSearchParams(location.search).get('demo');
-  const demoMode = demoParam === null ? null : (demoParam === 'half' ? 'half' : 'full');
+  const demoMode = demoParam === null ? null : ({ half: 'half', test: 'test' }[demoParam] || 'full');
 
   return {
     isDemo: !!demoMode, demoMode,

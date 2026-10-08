@@ -1,9 +1,9 @@
 <div align="center">
 
-# 🧶 뜨개 다이어리
+# 🧶 실실 SilSil
 
-**뜨고 있는 작품, 실, 도안, 단수를 한곳에.**<br>
-뜨개하는 사람이 쓰려고 직접 만든, 모눈종이 위 십자수 같은 뜨개 기록 앱이에요.
+**실이 쌓일수록 실실 웃게 되는 뜨개 기록 앱.**<br>뜨고 있는 작품, 실, 도안, 단수를 한곳에.<br>
+뜨개하는 사람이 쓰려고 직접 만든, 모눈종이 위 십자수 같은 앱이에요.
 
 ### 👉 [지금 바로 열기](https://seungaeahn.github.io/k_web/)
 
@@ -152,6 +152,7 @@ node scripts/serve.js 8080
 - `master` 브랜치에 푸시하면 GitHub Pages에 자동으로 배포돼요.
 - 코드를 바꾸면 `sw.js`의 `CACHE_NAME` 버전을 올려야 설치된 앱에도 새 버전이 반영돼요.
 - 주소 끝에 `?demo`(샘플러 전부 완성)나 `?demo=half`(진행 중)를 붙이면 목업 데이터로 열려요. 메모리에만 저장돼서 실제 기록은 건드리지 않아요.
+- 자동 테스트: `node tests/run.js` (설치할 것 없음, Chrome으로 실행). 테스트 케이스는 [docs/TESTCASES.md](docs/TESTCASES.md)에 있어요.
 
 ### 폴더 구조
 ```
@@ -173,6 +174,7 @@ js/demo.js            데모 모드 목업 데이터
 js/utils.js           날짜·문자열 도우미
 vendor/pdfjs/         PDF 도안 표시 (pdf.js 3.11.174)
 scripts/              로컬 서버, 아이콘 생성
+tests/                자동 테스트 (node tests/run.js)
 docs/screenshots/     README 화면 캡처
 ```
 

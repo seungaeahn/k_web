@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>실실 자동 테스트</title>
+<!-- 앱 화면을 그대로 띄우고 tests.js가 버튼을 눌러가며 확인함.
+     반드시 ?demo=test 로 열어야 실제 기록(localStorage) 대신 메모리 저장소를 씀. 실행: node tests/run.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div id="banner" class="banner"></div>
+<div id="app"></div>
+<nav class="tabbar">
+  <a href="#/" data-tab="projects"><span class="tab-icon" data-icon="project"></span>Projects</a>
+  <a href="#/yarn" data-tab="yarn"><span class="tab-icon" data-icon="yarn"></span>Yarn</a>
+  <a href="#/pattern" data-tab="pattern"><span class="tab-icon" data-icon="pattern"></span>Patterns</a>
+  <a href="#/tools" data-tab="tools"><span class="tab-icon" data-icon="tools"></span>Tools</a>
+  <a href="#/archive" data-tab="archive"><span class="tab-icon" data-icon="archive"></span>Archive</a>
+</nav>
+<div id="test-results" hidden></div>
+<script>
+  // 실수로 ?demo=test 없이 열면 실제 기록을 건드릴 수 있으니, 아래 스크립트를 읽지 않고 ?demo=test 로 다시 엶
+  if (new URLSearchParams(location.search).get('demo') !== 'test') {
+    location.replace(`${location.pathname}?demo=test${location.hash}`);
+    document.write('<plaintext hidden>');
+  }
+</script>
+<script src="../vendor/pdfjs/pdf.min.js"></script>
+<script>
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = '../vendor/pdfjs/pdf.worker.min.js';
+</script>
+<script src="../js/icons.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/filestore.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/ravelry.js"></script>
+<script src="../js/modal.js"></script>
+<script src="../js/sampler.js"></script>
+<script src="../js/characters.js"></script>
+<script src="../js/yarnjar.js"></script>
+<script src="../js/app.js"></script>
+<script src="tests.js"></script>
+</body>
+</html>
